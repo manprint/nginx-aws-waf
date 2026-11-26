@@ -1,0 +1,15 @@
+# Minimal lab: echo backend on waf_lab (use with node.yml + node.bridge.yml).
+services:
+  echo:
+    image: owasp/modsecurity-crs:4.30.0-nginx-alpine-202611190211
+    entrypoint: ["nginx", "-g", "daemon off;", "-c", "/etc/echo/echo.conf"]
+    user: root
+    healthcheck: {disable: true}
+    restart: unless-stopped
+    tmpfs: [/tmp]
+    volumes:
+      - ./lab/echo.conf:/etc/echo/echo.conf:ro
+    networks: [lab]
+networks:
+  lab:
+    name: waf_lab

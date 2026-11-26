@@ -1,0 +1,18 @@
+# WAF node (project "waf"). Use with node.host.yml (production) or node.bridge.yml (lab).
+name: waf
+services:
+  waf:
+    build:
+      context: ../..
+      dockerfile: waf/Dockerfile
+    image: nginx-aws-waf/waf:${WAF_VERSION:-dev}
+    restart: unless-stopped
+    tmpfs: [/tmp]
+    ulimits:
+      nofile: 65535
+    volumes:
+      - ${WAF_DATA_DIR}/runtime:/etc/waf/runtime:ro
+      - ${WAF_DATA_DIR}/lists:/etc/waf/lists:ro
+      - ${WAF_DATA_DIR}/certs:/etc/waf/certs:ro
+      - ${WAF_DATA_DIR}/geoip:/etc/waf/geoip:ro
+      - ${WAF_DATA_DIR}/logs:/var/log/waf

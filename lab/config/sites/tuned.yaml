@@ -1,0 +1,23 @@
+version: 1
+site_id: tuned
+server_names: [tuned.lab.test]
+app: generic
+upstream: {servers: ["echo:8081"]}
+client_ip: {source: xff, trusted_proxies: ["0.0.0.0/0", "::/0"]}
+body_limit: 16384
+fail: {pcre_limit: open}
+rule_groups:
+  - name: AWSManagedRulesCommonRuleSet
+    rule_action_overrides: {SizeRestrictions_BODY: count}
+  - name: AWSManagedRulesKnownBadInputsRuleSet
+    scope_down: {all: [{uri_path: {starts_with: /static-ok/}, negate: true}]}
+custom_rules:
+  - name: BlockLargeBodyOutsideRpc
+    slot: after:AWSManagedRulesCommonRuleSet
+    action: block
+    match:
+      all:
+        - {label: "awswaf:managed:aws:core-rule-set:SizeRestrictions_Body"}
+        - {uri_path: {starts_with: /web/dataset/}, negate: true}
+path_overrides:
+  - {path_prefix: /files/, rules: {RestrictedExtensions_URIPATH: count}}

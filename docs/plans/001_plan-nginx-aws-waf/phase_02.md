@@ -253,7 +253,7 @@ server {
   limit_req zone=rl_<site> burst=<limit> nodelay; limit_req_status 403;               # rate_limit
   limit_req_dry_run on;                                                               # rate_limit.action=count
   error_page 403 /__waf/403.html; error_page 500 /__waf/500.html;
-  location ^~ /__waf/ { internal; modsecurity off; alias <R>/static/<site>/; default_type text/html; more_set_headers "Server: awselb/2.0"; }
+  location ^~ /__waf/ { internal; modsecurity off; alias <R>/static/<site>/; default_type text/html; etag off; more_set_headers "Server: awselb/2.0"; }
   location <realtime.path> { proxy_pass http://up_<site>_rt; <proxy common>; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection $connection_upgrade; proxy_read_timeout 3600s; }
   location / { proxy_pass http(s)://up_<site>; <proxy common>; }
 }
@@ -377,8 +377,8 @@ Render first produces content with the placeholder `/etc/waf/runtime/REV`, hashe
       ```dockerfile
       FROM owasp/modsecurity-crs:4.30.0-nginx-alpine-202611190211
       USER root
-      RUN mkdir -p /etc/waf/runtime /etc/waf/lists /etc/waf/certs /etc/waf/geoip /var/log/waf /tmp/nginx \
-       && chown -R nginx:nginx /var/log/waf /tmp/nginx
+      RUN mkdir -p /etc/waf/runtime /etc/waf/lists /etc/waf/certs /etc/waf/geoip /var/log/waf \
+       && chown -R nginx:nginx /var/log/waf
       HEALTHCHECK --interval=10s --timeout=3s CMD wget -qO- http://127.0.0.1:8090/healthz || exit 1
       ENTRYPOINT []
       CMD ["nginx", "-g", "daemon off;", "-c", "/etc/waf/runtime/current/nginx/nginx.conf"]

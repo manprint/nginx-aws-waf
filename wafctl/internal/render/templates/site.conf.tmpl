@@ -40,7 +40,7 @@ server {
 {{- end}}
 {{- end}}
   error_page 403 /__waf/403.html; error_page 500 /__waf/500.html;
-  location ^~ /__waf/ { internal; modsecurity off; alias {{.R}}/static/{{.ID}}/; default_type text/html; more_set_headers "Server: awselb/2.0"; }
+  location ^~ /__waf/ { internal; modsecurity off; alias {{.R}}/static/{{.ID}}/; default_type text/html; etag off; more_set_headers "Server: awselb/2.0"; }
 {{- if .RT}}
   location {{.RT.Path}} {
     proxy_pass http://up_{{.ID}}_rt;
