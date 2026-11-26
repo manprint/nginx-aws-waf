@@ -1,0 +1,16 @@
+# Lab tools (project waf, profile "tools"): run on demand inside waf_lab.
+services:
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.65.1-noble
+    profiles: [tools]
+    working_dir: /work
+    volumes:
+      - ../../tests/legit:/work
+    environment: [SITES, RUN_ID]
+    command: ["bash", "-lc", "npm ci --no-audit --no-fund && npx playwright test"]
+    ipc: host
+    networks: [lab]
+networks:
+  lab:
+    name: waf_lab
+    external: true

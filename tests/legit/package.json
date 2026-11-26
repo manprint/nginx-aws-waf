@@ -1,0 +1,11 @@
+{
+  "name": "waf-legit-flows",
+  "private": true,
+  "description": "Playwright legit Odoo flows through the WAF (plan 001, unit 2.3)",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
+}

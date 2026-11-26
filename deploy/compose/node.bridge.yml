@@ -3,7 +3,7 @@ services:
     ports: ["8080:8080", "8443:8443"]
     networks:
       lab:
-        aliases: [waf]
+        aliases: [waf, shop12.lab.test, shop14.lab.test, shop16.lab.test, shop18.lab.test]   # lab: Playwright reaches the sites by name
   vector:
     networks: [lab]
 networks:
