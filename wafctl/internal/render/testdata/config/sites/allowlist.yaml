@@ -1,0 +1,12 @@
+version: 1
+site_id: allowlist
+server_names: [allowlist.lab.test]
+app: generic
+upstream: {servers: ["echo:8081"]}
+client_ip: {source: xff, trusted_proxies: ["0.0.0.0/0", "::/0"]}
+default_action: block
+custom_rules:
+  - name: AllowPublic
+    slot: start
+    action: allow
+    match: {all: [{uri_path: {starts_with: /public/}}]}

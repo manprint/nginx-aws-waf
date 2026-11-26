@@ -138,6 +138,14 @@ func TestVAL6_CustomRules(t *testing.T) {
 		{"transform", func(c *Config) {
 			s0(c).CustomRules = cr(Match{All: []Cond{{URIPath: &StrMatch{Exact: "/a", Transform: []string{"x"}}}}})
 		}, "transform"},
+		{"quote in value", func(c *Config) { s0(c).CustomRules = cr(Match{All: []Cond{{URIPath: &StrMatch{Exact: "/a'b"}}}}) }, "quotes or newlines"},
+		{"seven conds", func(c *Config) {
+			m := Match{}
+			for i := 0; i < 7; i++ {
+				m.All = append(m.All, Cond{Method: []string{"GET"}})
+			}
+			s0(c).CustomRules = cr(m)
+		}, "exceed the maximum of 6"},
 		{"header name", func(c *Config) { s0(c).CustomRules = cr(Match{All: []Cond{{Header: &StrMatch{Exact: "a"}}}}) }, "name is required"},
 	})
 }

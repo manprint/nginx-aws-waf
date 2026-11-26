@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"nginxawswaf/wafctl/internal/catalog"
 	"nginxawswaf/wafctl/internal/env"
@@ -351,6 +352,14 @@ func validateStr(v *vctx, p string, m *StrMatch, needName bool) {
 	if !needName && m.Name != "" {
 		v.err(p+".name", "name is not allowed for uri_path")
 	}
+	for _, s := range []string{m.Exact, m.StartsWith, m.Contains} {
+		if strings.ContainsAny(s, "'\"\r\n") {
+			v.err(p, "value %q must not contain quotes or newlines", s)
+		}
+	}
+	if strings.ContainsAny(m.Regex+m.Name, "\r\n") || strings.ContainsAny(m.Name, "'\" ") {
+		v.err(p, "name/regex must not contain newlines (name: no quotes or spaces)")
+	}
 	n := 0
 	for _, s := range []string{m.Exact, m.StartsWith, m.Contains, m.Regex} {
 		if s != "" {
@@ -375,6 +384,9 @@ func validateStr(v *vctx, p string, m *StrMatch, needName bool) {
 func validateMatch(v *vctx, cfg *Config, cat *catalog.Catalog, p string, m *Match) {
 	if len(m.All) == 0 {
 		v.err(p+".all", "match.all must not be empty")
+	}
+	if len(m.All) > 6 {
+		v.err(p+".all", "%d conditions exceed the maximum of 6", len(m.All))
 	}
 	for i, c := range m.All {
 		cp := fmt.Sprintf("%s.all[%d]", p, i)

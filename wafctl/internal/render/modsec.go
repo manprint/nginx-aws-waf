@@ -150,14 +150,22 @@ func (r *renderer) groupRules(l *lines, g *catalog.Group) {
 	}
 }
 
-// customRules returns the custom-rule text of every site for a slot (filled in 1.2).
-func (r *renderer) customRules(slot string) ([]string, error) { return nil, nil }
-
-// scopeDowns returns the scope-down blocks of every site for group gi (filled in 1.2).
-func (r *renderer) scopeDowns(gi int) ([]string, error) { return nil, nil }
-
-// extraFiles adds site, nginx, static and index files (filled in 1.2/1.3).
-func (r *renderer) extraFiles(files map[string][]byte) error { return nil }
+// extraFiles adds the site files and rules-index.json (nginx/static files in 1.3).
+func (r *renderer) extraFiles(files map[string][]byte) error {
+	for _, s := range r.sites {
+		t, err := r.siteFile(s)
+		if err != nil {
+			return err
+		}
+		files["modsec/sites/"+s.Eff.Site.SiteID+".conf"] = []byte(t)
+	}
+	idx, err := r.rulesIndex()
+	if err != nil {
+		return err
+	}
+	files["rules-index.json"] = idx
+	return nil
+}
 
 // audit.scope=relevant: SUMMARY (and so the audit record) only for requests with a hit, a failure or a default block.
 const relevantHelpers = `SecRule &TX:/^hit_/ "@gt 0" "id:1900890,phase:2,pass,nolog,setvar:tx.relevant=1"

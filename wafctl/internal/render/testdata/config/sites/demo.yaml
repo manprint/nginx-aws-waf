@@ -1,0 +1,7 @@
+version: 1
+site_id: demo
+server_names: [demo.lab.test]
+app: generic
+upstream: {servers: ["echo:8081"]}
+client_ip: {source: xff, trusted_proxies: ["0.0.0.0/0", "::/0"]}
+profile: aws-default
