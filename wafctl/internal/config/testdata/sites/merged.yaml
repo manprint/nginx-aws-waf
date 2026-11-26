@@ -1,0 +1,14 @@
+version: 1
+site_id: merged
+server_names: [merged.test]
+app: generic
+profile: p-overrides
+upstream: {servers: ["echo:8081"]}
+rule_groups:
+  - name: AWSManagedRulesCommonRuleSet
+    rule_action_overrides: {NoUserAgent_HEADER: count}
+custom_rules:
+  - name: A
+    slot: start
+    action: block
+    match: {all: [{uri_path: {starts_with: /site/}}]}

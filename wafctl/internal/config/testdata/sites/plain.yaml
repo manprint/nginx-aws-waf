@@ -1,0 +1,6 @@
+version: 1
+site_id: plain
+server_names: [plain.test]
+app: generic
+upstream: {servers: ["echo:8081"]}
+tls: {mode: off}

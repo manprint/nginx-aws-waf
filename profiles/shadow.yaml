@@ -1,0 +1,5 @@
+version: 1
+name: shadow
+description: Like aws-default, but every rule only counts (shadow mode for first deploys).
+extends: aws-default
+mode: count

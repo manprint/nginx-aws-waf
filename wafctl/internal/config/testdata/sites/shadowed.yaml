@@ -1,0 +1,6 @@
+version: 1
+site_id: shadowed
+server_names: [shadowed.test]
+app: generic
+profile: shadow
+upstream: {servers: ["echo:8081"]}

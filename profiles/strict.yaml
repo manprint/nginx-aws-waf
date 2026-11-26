@@ -1,0 +1,9 @@
+version: 1
+name: strict
+description: aws-default plus the optional SQLi and AnonymousIp groups.
+extends: aws-default
+rule_groups:
+  - name: AWSManagedRulesSQLiRuleSet
+    enabled: true
+  - name: AWSManagedRulesAnonymousIpList
+    enabled: true

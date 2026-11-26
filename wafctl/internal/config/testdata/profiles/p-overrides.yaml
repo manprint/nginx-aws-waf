@@ -1,0 +1,11 @@
+version: 1
+name: p-overrides
+extends: aws-default
+rule_groups:
+  - name: AWSManagedRulesCommonRuleSet
+    rule_action_overrides: {SizeRestrictions_BODY: count}
+custom_rules:
+  - name: A
+    slot: start
+    action: count
+    match: {all: [{uri_path: {starts_with: /profile/}}]}

@@ -1,0 +1,3 @@
+version: 1
+name: aws-default
+description: One-click AWS WAF ALB web ACL (IpReputation, CommonRuleSet, KnownBadInputs) with AWS default actions.
