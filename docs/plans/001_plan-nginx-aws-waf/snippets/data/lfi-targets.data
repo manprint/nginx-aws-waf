@@ -1,0 +1,11 @@
+etc/passwd
+etc/shadow
+etc/hosts
+etc/group
+proc/self/
+proc/version
+windows/win.ini
+windows/system32/
+boot.ini
+.htpasswd
+.ssh/id_rsa

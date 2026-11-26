@@ -1,0 +1,16 @@
+# VERIFIED 2026-11-26 on grafana/grafana:13.2.7 (receiver test API → echo server received:
+#   /notify/waf {"body":"firing: 1 alert(s). site shop","tag":"waf","title":"[WAF] WafBlockSpike","type":"warning"})
+# NOTE: `toJson` and `ternary` are NOT available in Grafana payload templates; use coll.Dict + data.ToJSON.
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: apprise
+    receivers:
+      - uid: apprise-webhook
+        type: webhook
+        settings:
+          url: http://apprise:8000/notify/waf
+          httpMethod: POST
+          payload:
+            template: |
+              {{ $t := "success" }}{{ if eq .Status "firing" }}{{ $t = "warning" }}{{ end }}{{ coll.Dict "title" (printf "[WAF] %s" .CommonLabels.alertname) "body" (printf "%s: %d alert(s). %s" .Status (len .Alerts) .CommonAnnotations.summary) "type" $t "tag" "waf" | data.ToJSON }}

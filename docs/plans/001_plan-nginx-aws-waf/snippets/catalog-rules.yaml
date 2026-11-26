@@ -1,0 +1,386 @@
+# VERIFIED 2026-11-26 by agent-1 (plan 001 research, see overview R-section). Copy, then adapt only where the phase file says.
+# Rule catalog: single source of truth for rendering, docs, export and tests.
+# Order of groups and rules = AWS evaluation order.
+version: 1
+groups:
+  - key: iprep
+    name: AWSManagedRulesAmazonIpReputationList
+    vendor: AWS
+    wcu: 25
+    label_ns: "awswaf:managed:aws:amazon-ip-list:"
+    optional: false
+    rules:
+      - id: 1100010
+        name: AWSManagedIPReputationList
+        label: AWSManagedIPReputationList
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REMOTE_ADDR", op: "@ipMatchFromFile /etc/waf/lists/AWSManagedIPReputationList.txt"}]
+          - [{vars: "REMOTE_ADDR", op: "@ipMatchFromFile /etc/waf/lists/custom-reputation.txt"}]
+      - id: 1100020
+        name: AWSManagedReconnaissanceList
+        label: AWSManagedReconnaissanceList
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REMOTE_ADDR", op: "@ipMatchFromFile /etc/waf/lists/AWSManagedReconnaissanceList.txt"}]
+      - id: 1100030
+        name: AWSManagedIPDDoSList
+        label: AWSManagedIPDDoSList
+        default_action: count
+        fidelity: stub
+        detectors:
+          - [{vars: "REMOTE_ADDR", op: "@ipMatchFromFile /etc/waf/lists/AWSManagedIPDDoSList.txt"}]
+  - key: anonip
+    name: AWSManagedRulesAnonymousIpList
+    vendor: AWS
+    wcu: 50
+    label_ns: "awswaf:managed:aws:anonymous-ip-list:"
+    optional: true
+    rules:
+      - id: 1450010
+        name: AnonymousIPList
+        label: AnonymousIPList
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REMOTE_ADDR", op: "@ipMatchFromFile /etc/waf/lists/AnonymousIPList.txt"}]
+      - id: 1450020
+        name: HostingProviderIPList
+        label: HostingProviderIPList
+        default_action: block
+        fidelity: stub
+        detectors:
+          - [{vars: "REMOTE_ADDR", op: "@ipMatchFromFile /etc/waf/lists/HostingProviderIPList.txt"}]
+  - key: crs
+    name: AWSManagedRulesCommonRuleSet
+    vendor: AWS
+    wcu: 700
+    label_ns: "awswaf:managed:aws:core-rule-set:"
+    optional: false
+    rules:
+      - id: 1200010
+        name: NoUserAgent_HEADER
+        label: NoUserAgent_Header
+        default_action: block
+        fidelity: exact
+        detectors:
+          - [{vars: "&REQUEST_HEADERS:User-Agent", op: "@eq 0"}]
+      - id: 1200020
+        name: UserAgent_BadBots_HEADER
+        label: BadBots_Header
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_HEADERS:User-Agent", op: "@pmFromFile /etc/waf/data/bad-bots.data", t: [lowercase]}]
+      - id: 1200030
+        name: SizeRestrictions_QUERYSTRING
+        label: SizeRestrictions_QueryString
+        default_action: block
+        fidelity: exact
+        detectors:
+          - [{vars: "QUERY_STRING", op: "@gt 2048", t: [length]}]
+      - id: 1200040
+        name: SizeRestrictions_Cookie_HEADER
+        label: SizeRestrictions_Cookie_Header
+        default_action: block
+        fidelity: exact
+        detectors:
+          - [{vars: "REQUEST_HEADERS:Cookie", op: "@gt 10240", t: [length]}]
+      - id: 1200050
+        name: SizeRestrictions_BODY
+        label: SizeRestrictions_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_HEADERS:Content-Length", op: "@gt 8192"}]
+          - [{vars: "&REQUEST_HEADERS:Content-Length", op: "@eq 0"}, {vars: "REQUEST_BODY_LENGTH", op: "@ge 8192"}]
+      - id: 1200060
+        name: SizeRestrictions_URIPATH
+        label: SizeRestrictions_URIPath
+        default_action: block
+        fidelity: exact
+        detectors:
+          - [{vars: "TX:raw_path", op: "@gt 1024", t: [length]}]
+      - id: 1200070
+        name: EC2MetaDataSSRF_BODY
+        label: EC2MetaDataSSRF_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: "@pmFromFile /etc/waf/data/ec2-metadata.data", t: [urlDecodeUni, lowercase]}]
+      - id: 1200080
+        name: EC2MetaDataSSRF_COOKIE
+        label: EC2MetaDataSSRF_Cookie
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_COOKIES", op: "@pmFromFile /etc/waf/data/ec2-metadata.data", t: [urlDecodeUni, lowercase]}]
+      - id: 1200090
+        name: EC2MetaDataSSRF_URIPATH
+        label: EC2MetaDataSSRF_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: "@pmFromFile /etc/waf/data/ec2-metadata.data", t: [urlDecodeUni, lowercase]}]
+      - id: 1200100
+        name: EC2MetaDataSSRF_QUERYARGUMENTS
+        label: EC2MetaDataSSRF_QueryArguments
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "ARGS_GET", op: "@pmFromFile /etc/waf/data/ec2-metadata.data", t: [urlDecodeUni, lowercase]}]
+      - id: 1200110
+        name: GenericLFI_QUERYARGUMENTS
+        label: GenericLFI_QueryArguments
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "ARGS_GET", op: '@rx (?:^|[\\/;])\.{2,3}[\\/;]', t: [utf8toUnicode, urlDecodeUni, removeNulls]}]
+          - [{vars: "ARGS_GET", op: "@pmFromFile /etc/waf/data/lfi-targets.data", t: [utf8toUnicode, urlDecodeUni, normalizePathWin, lowercase]}]
+      - id: 1200120
+        name: GenericLFI_URIPATH
+        label: GenericLFI_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@rx (?:^|[\\/;])\.{2,3}[\\/;]', t: [utf8toUnicode, urlDecodeUni, removeNulls]}]
+          - [{vars: "TX:raw_path", op: "@pmFromFile /etc/waf/data/lfi-targets.data", t: [utf8toUnicode, urlDecodeUni, normalizePathWin, lowercase]}]
+      - id: 1200130
+        name: GenericLFI_BODY
+        label: GenericLFI_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx (?:^|[\\/;=:"''\s])\.{2,3}[\\/;]', t: [utf8toUnicode, urlDecodeUni, removeNulls]}]
+          - [{vars: "REQUEST_BODY", op: "@pmFromFile /etc/waf/data/lfi-targets.data", t: [utf8toUnicode, urlDecodeUni, normalizePathWin, lowercase]}]
+      - id: 1200140
+        name: RestrictedExtensions_URIPATH
+        label: RestrictedExtensions_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@rx \.(?:asa|asax|backup|bak|bat|cdx|cer|cfg|cmd|com|config|conf|crt|cs|csproj|csr|dat|db|dbf|dll|dos|htr|htw|ida|idc|idq|inc|ini|key|licx|lnk|log|mdb|old|pass|pdb|pol|printer|pwd|rdb|resources|resx|sql|swp|sys|vb|vbs|vbproj|vsdisco|webinfo|xsd|xsx)$', t: [urlDecodeUni, lowercase]}]
+      - id: 1200150
+        name: RestrictedExtensions_QUERYARGUMENTS
+        label: RestrictedExtensions_QueryArguments
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "ARGS_GET", op: '@rx \.(?:asa|asax|backup|bak|bat|cdx|cer|cfg|cmd|com|config|conf|crt|cs|csproj|csr|dat|db|dbf|dll|dos|htr|htw|ida|idc|idq|inc|ini|key|licx|lnk|log|mdb|old|pass|pdb|pol|printer|pwd|rdb|resources|resx|sql|swp|sys|vb|vbs|vbproj|vsdisco|webinfo|xsd|xsx)$', t: [urlDecodeUni, lowercase]}]
+      - id: 1200160
+        name: GenericRFI_QUERYARGUMENTS
+        label: GenericRFI_QueryArguments
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "ARGS_GET", op: '@rx (?:file|ftps?|https?)://(?:[0-9]{1,3}\.){3}[0-9]{1,3}', t: [urlDecodeUni, lowercase]}]
+      - id: 1200170
+        name: GenericRFI_BODY
+        label: GenericRFI_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx (?:file|ftps?|https?)://(?:[0-9]{1,3}\.){3}[0-9]{1,3}', t: [urlDecodeUni, lowercase]}]
+      - id: 1200180
+        name: GenericRFI_URIPATH
+        label: GenericRFI_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@rx (?:file|ftps?|https?):/{1,2}(?:[0-9]{1,3}\.){3}[0-9]{1,3}', t: [urlDecodeUni, lowercase]}]
+      - id: 1200190
+        name: CrossSiteScripting_COOKIE
+        label: CrossSiteScripting_Cookie
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_COOKIES", op: "@detectXSS", t: [utf8toUnicode, urlDecodeUni, htmlEntityDecode, jsDecode, cssDecode, removeNulls]}]
+          - [{vars: "REQUEST_COOKIES", op: '@rx (?i)<script[^>]*>', t: [utf8toUnicode, urlDecodeUni, htmlEntityDecode, jsDecode, cssDecode, removeNulls]}]
+      - id: 1200200
+        name: CrossSiteScripting_QUERYARGUMENTS
+        label: CrossSiteScripting_QueryArguments
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "ARGS_GET", op: "@detectXSS", t: [utf8toUnicode, urlDecodeUni, htmlEntityDecode, jsDecode, cssDecode, removeNulls]}]
+          - [{vars: "ARGS_GET", op: '@rx (?i)<script[^>]*>', t: [utf8toUnicode, urlDecodeUni, htmlEntityDecode, jsDecode, cssDecode, removeNulls]}]
+      - id: 1200210
+        name: CrossSiteScripting_BODY
+        label: CrossSiteScripting_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: "@detectXSS", t: [utf8toUnicode, urlDecodeUni, htmlEntityDecode, jsDecode, cssDecode, removeNulls]}]
+          - [{vars: "REQUEST_BODY", op: '@rx (?i)<script[^>]*>', t: [utf8toUnicode, urlDecodeUni, htmlEntityDecode, jsDecode, cssDecode, removeNulls]}]
+      - id: 1200220
+        name: CrossSiteScripting_URIPATH
+        label: CrossSiteScripting_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: "@detectXSS", t: [utf8toUnicode, urlDecodeUni, htmlEntityDecode, jsDecode, cssDecode, removeNulls]}]
+          - [{vars: "TX:raw_path", op: '@rx (?i)<script[^>]*>', t: [utf8toUnicode, urlDecodeUni, htmlEntityDecode, jsDecode, cssDecode, removeNulls]}]
+  - key: kbi
+    name: AWSManagedRulesKnownBadInputsRuleSet
+    vendor: AWS
+    wcu: 200
+    label_ns: "awswaf:managed:aws:known-bad-inputs:"
+    optional: false
+    rules:
+      - id: 1300010
+        name: JavaDeserializationRCE_HEADER
+        label: JavaDeserializationRCE_Header
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_HEADERS_NAMES|REQUEST_HEADERS", op: '@rx (?:java\.lang\.(?:runtime|processbuilder)|class\.module\.classloader|spring\.cloud\.function\.routing-expression|\.getruntime\(\)\.exec\(|ro0ab)', t: [urlDecodeUni, lowercase]}]
+      - id: 1300020
+        name: JavaDeserializationRCE_BODY
+        label: JavaDeserializationRCE_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx (?:java\.lang\.(?:runtime|processbuilder)|class\.module\.classloader|spring\.cloud\.function\.routing-expression|\.getruntime\(\)\.exec\(|ro0ab)', t: [urlDecodeUni, lowercase]}]
+      - id: 1300030
+        name: JavaDeserializationRCE_URIPATH
+        label: JavaDeserializationRCE_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@rx (?:java\.lang\.(?:runtime|processbuilder)|class\.module\.classloader|spring\.cloud\.function\.routing-expression|\.getruntime\(\)\.exec\(|ro0ab)', t: [urlDecodeUni, lowercase]}]
+      - id: 1300040
+        name: JavaDeserializationRCE_QUERYSTRING
+        label: JavaDeserializationRCE_QueryString
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "QUERY_STRING", op: '@rx (?:java\.lang\.(?:runtime|processbuilder)|class\.module\.classloader|spring\.cloud\.function\.routing-expression|\.getruntime\(\)\.exec\(|ro0ab)', t: [urlDecodeUni, lowercase]}]
+      - id: 1300050
+        name: Host_localhost_HEADER
+        label: Host_Localhost_Header
+        default_action: block
+        fidelity: exact
+        detectors:
+          - [{vars: "REQUEST_HEADERS:Host", op: '@rx ^(?:localhost|127(?:\.[0-9]{1,3}){3}|\[::1\]|::1|0\.0\.0\.0)(?::[0-9]+)?$', t: [lowercase]}]
+      - id: 1300060
+        name: PROPFIND_METHOD
+        label: Propfind_Method
+        default_action: block
+        fidelity: exact
+        detectors:
+          - [{vars: "REQUEST_METHOD", op: "@streq PROPFIND", t: [uppercase]}]
+      - id: 1300070
+        name: ExploitablePaths_URIPATH
+        label: ExploitablePaths_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@rx (?:^|/)(?:web-inf|meta-inf)(?:/|$)', t: [urlDecodeUni, lowercase]}]
+      - id: 1300080
+        name: Log4JRCE_HEADER
+        label: Log4JRCE_Header
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_HEADERS_NAMES|REQUEST_HEADERS", op: '@rx (?i)(?:\$|&dollar;?)(?:\{|&l(?:brace|cub);?)(?:[^\}]{0,15}(?:\$|&dollar;?)(?:\{|&l(?:brace|cub);?)|jndi|ctx)', t: [urlDecodeUni, jsDecode, htmlEntityDecode]}]
+      - id: 1300090
+        name: Log4JRCE_QUERYSTRING
+        label: Log4JRCE_QueryString
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "QUERY_STRING", op: '@rx (?i)(?:\$|&dollar;?)(?:\{|&l(?:brace|cub);?)(?:[^\}]{0,15}(?:\$|&dollar;?)(?:\{|&l(?:brace|cub);?)|jndi|ctx)', t: [urlDecodeUni, jsDecode, htmlEntityDecode]}]
+      - id: 1300100
+        name: Log4JRCE_BODY
+        label: Log4JRCE_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx (?i)(?:\$|&dollar;?)(?:\{|&l(?:brace|cub);?)(?:[^\}]{0,15}(?:\$|&dollar;?)(?:\{|&l(?:brace|cub);?)|jndi|ctx)', t: [urlDecodeUni, jsDecode, htmlEntityDecode]}]
+      - id: 1300110
+        name: Log4JRCE_URIPATH
+        label: Log4JRCE_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@rx (?i)(?:\$|&dollar;?)(?:\{|&l(?:brace|cub);?)(?:[^\}]{0,15}(?:\$|&dollar;?)(?:\{|&l(?:brace|cub);?)|jndi|ctx)', t: [urlDecodeUni, jsDecode, htmlEntityDecode]}]
+      - id: 1300120
+        name: ReactJSRCE_BODY
+        label: ReactJSRCE_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx (?:__proto__|constructor\s*:\s*constructor|"\$@[0-9]+")', t: [urlDecodeUni]}]
+      - {id: 1300130, name: ApacheMod_HTTP2, label: ApacheMod_HTTP2, default_action: count, fidelity: stub, detectors: []}
+      - {id: 1300140, name: Java4Shell_BODY, label: Java4Shell_Body, default_action: count, fidelity: stub, detectors: []}
+      - {id: 1300150, name: Java4Shell_QUERYARGUMENTS, label: Java4Shell_QueryArguments, default_action: count, fidelity: stub, detectors: []}
+      - {id: 1300160, name: Java4Shell_HEADER, label: Java4Shell_Header, default_action: count, fidelity: stub, detectors: []}
+      - {id: 1300170, name: Java4Shell_AUTHORIZATION_HEADER, label: Java4Shell_Authorization_Header, default_action: count, fidelity: stub, detectors: []}
+      - {id: 1300180, name: Ruby2Shell_METHODOVERRIDE_HEADER, label: Ruby2Shell_MethodOverride_Header, default_action: count, fidelity: stub, detectors: []}
+      - {id: 1300190, name: Ruby2Shell_MethodOverride_BODY, label: Ruby2Shell_MethodOverride_Body, default_action: count, fidelity: stub, detectors: []}
+      - {id: 1300200, name: Ruby2Shell_MULTIPARTMETHOD, label: Ruby2Shell_MultipartMethod, default_action: count, fidelity: stub, detectors: []}
+  - key: sqli
+    name: AWSManagedRulesSQLiRuleSet
+    vendor: AWS
+    wcu: 200
+    label_ns: "awswaf:managed:aws:sql-database:"
+    optional: true
+    rules:
+      - id: 1400010
+        name: SQLi_QUERYARGUMENTS
+        label: SQLi_QueryArguments
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "ARGS_GET", op: "@detectSQLi", t: [utf8toUnicode, urlDecodeUni, removeNulls]}]
+      - id: 1400020
+        name: SQLiExtendedPatterns_QUERYARGUMENTS
+        label: SQLiExtendedPatterns_QueryArguments
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "ARGS_GET", op: '@rx (?:\bunion\b[\s\S]{0,40}\bselect\b|\b(?:pg_)?sleep\s*\(|\bbenchmark\s*\(|\bwaitfor\s+delay\b|\binformation_schema\b)', t: [urlDecodeUni, lowercase]}]
+      - id: 1400030
+        name: SQLi_BODY
+        label: SQLi_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: "@detectSQLi", t: [utf8toUnicode, urlDecodeUni, removeNulls]}]
+      - id: 1400040
+        name: SQLiExtendedPatterns_BODY
+        label: SQLiExtendedPatterns_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx (?:\bunion\b[\s\S]{0,40}\bselect\b|\b(?:pg_)?sleep\s*\(|\bbenchmark\s*\(|\bwaitfor\s+delay\b|\binformation_schema\b)', t: [urlDecodeUni, lowercase]}]
+      - id: 1400050
+        name: SQLiExtendedPatterns_HEADER
+        label: SQLiExtendedPatterns_Header
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_HEADERS", op: '@rx (?:\bunion\b[\s\S]{0,40}\bselect\b|\b(?:pg_)?sleep\s*\(|\bbenchmark\s*\(|\bwaitfor\s+delay\b|\binformation_schema\b)', t: [urlDecodeUni, lowercase]}]
+      - id: 1400060
+        name: SQLiExtendedPatterns_URIPATH
+        label: SQLiExtendedPatterns_UriPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@rx (?:\bunion\b[\s\S]{0,40}\bselect\b|\b(?:pg_)?sleep\s*\(|\bbenchmark\s*\(|\bwaitfor\s+delay\b|\binformation_schema\b)', t: [urlDecodeUni, lowercase]}]
+      - id: 1400070
+        name: SQLi_COOKIE
+        label: SQLi_Cookie
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_COOKIES", op: "@detectSQLi", t: [utf8toUnicode, urlDecodeUni, removeNulls]}]
+      - id: 1400080
+        name: SQLi_URIPATH
+        label: SQLi_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: "@detectSQLi", t: [utf8toUnicode, urlDecodeUni, removeNulls]}]

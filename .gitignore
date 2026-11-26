@@ -1,0 +1,16 @@
+# Sorgenti di terzi scaricati (rigenerabili con scripts/fetch-crs.sh)
+vendor/
+
+# Liste IP rigenerabili (scripts/fetch-ip-lists.sh); la lista di test e' versionata
+data/ip-reputation/*.txt
+!data/ip-reputation/custom-test.txt
+
+# build / runtime (never commit)
+/build/
+/.run/
+/wafctl/bin/
+*.pem
+*.key
+/lab/config/state/
+node_modules/
+/tests/legit/test-results/
