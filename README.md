@@ -26,19 +26,36 @@ wafctl explain tuned        # come è configurato un sito
 make lab-min-down
 ```
 
+## Lab Odoo
+
+Quattro Odoo Community (12, 14, 16, 18) dietro il WAF, con Postgres dedicati. Serve circa
+**10 GB di RAM libera**; il primo avvio crea i database (circa 3 minuti).
+
+```sh
+source scripts/lab-env.sh
+make lab-up        # nodo + odoo12/14/16/18 su shopNN.lab.test (porta 8080), DB "lab", admin/admin
+make lab-legit     # flussi Playwright legittimi: 0 blocchi attesi
+make test-odoo     # corpus rilanciato sui siti Odoo con tests/odoo-exceptions.yaml
+make lab-attack    # nuclei + nikto (risultati in build/lab/)
+make lab-matrix    # matrice azioni/regole/disaccordi AWS → build/lab/matrix.md
+make lab-down
+```
+
+Profili e motivazioni: [docs/odoo.md](docs/odoo.md).
+
 ## Mappa delle directory
 
 | Percorso | Contenuto |
 |---|---|
 | `waf/` | catalogo regole, file dati, pagine 403/500, Dockerfile del motore |
 | `wafctl/` | CLI Go (`validate`, `render`, `apply`, `diff`, `explain`, `bypass`, `test`, `logs`, `catalog`) |
-| `profiles/` | profili di prodotto (`aws-default`, `shadow`, `strict`) |
+| `profiles/` | profili di prodotto (`aws-default`, `shadow`, `strict`, `odoo-*`) |
 | `lab/config/` | configurazione del nodo di lab (`node.yaml`, `sites/`) |
 | `deploy/compose/` | compose del nodo (`node.yml` + `node.host.yml` / `node.bridge.yml`, lab) |
 | `deploy/vector/` | pipeline Vector del nodo (eventi uniti in JSONL) |
 | `deploy/systemd/` | timer per bypass e rotazione log |
-| `tests/` | corpus di richieste ed e2e (`tests/README.md`) |
-| `scripts/` | fetch, `lab-env.sh`, `ngx-test.sh`, `bench.sh` |
+| `tests/` | corpus di richieste, e2e, flussi legittimi Playwright (`tests/legit/`) |
+| `scripts/` | fetch, `lab-env.sh`, `ngx-test.sh`, `bench.sh`, `lab-attack.sh`, `lab-matrix.sh` (+ `sql/`) |
 | `data/` | liste IP e definizioni AWS scaricate |
 | `docs/` | documentazione (sotto) e piani (`docs/plans/`) |
 
@@ -49,6 +66,8 @@ make lab-min-down
 - [docs/tuning.md](docs/tuning.md) — flusso shadow → count + label rule → enforce, bypass
 - [docs/operations.md](docs/operations.md) — percorsi, apply/rollback, systemd, log
 - [docs/performance.md](docs/performance.md) — benchmark
+- [docs/odoo.md](docs/odoo.md) — profili Odoo, eccezioni, lab, tuning di un modulo
+- [docs/lab-matrix-001.md](docs/lab-matrix-001.md) — matrice di lab finale del piano 001
 - [tests/README.md](tests/README.md) — test e corpus
 - [waf/README.md](waf/README.md) — motore e catalogo
 

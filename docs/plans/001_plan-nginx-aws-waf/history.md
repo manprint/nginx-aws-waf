@@ -120,3 +120,9 @@
 - Run 85c5a23c (11 min 40 s): nuclei 0 findings on all 4 sites (outputs empty); nikto 100 % blocked by UserAgent_BadBots_HEADER (4914 req/site). Matrix 26-11-2026: 5 sections; legit.sql → 0.
 - Finding (open, for hardening later; not a gate): nginx-native errors before site assignment (e.g. TRACE → 405, malformed → 400) answer with `Server: nginx`; nikto reports "Server banner changed from 'awselb/2.0' to 'nginx'". Recorded as a fidelity gap vs ALB.
 - G-U24 PASS.
+
+## 2.5 attempt 1 — DONE (26-11-2026 UTC, agent-1:opus)
+- Tuning loop: iteration 1 converged (no profile change). make lab-legit (RUN_ID d496b68a) 12/12, 0 BLOCK; make test-odoo 48/48 ×4; make test-e2e PASSED 62/62; TestPRF1_ PASS.
+- Evidence (legit-only matches): SizeRestrictions_BODY COUNT on /web/dataset/call_kw (18/18/18/15 per site), CrossSiteScripting_BODY COUNT on call_kw (6/6/6/5). GenericRFI_BODY never matched by legit flows: kept in odoo-common as preventive (documented in docs/odoo.md), no exception added. Version profiles stay empty extends.
+- NEW docs/odoo.md, docs/lab-matrix-001.md (matrix 26-11-2026); README "Lab Odoo" section + doc links.
+- G-U25 PASS.
