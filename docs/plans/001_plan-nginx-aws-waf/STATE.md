@@ -11,8 +11,8 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Scope: plan 001 · RUNNING · overrides none
 - Unit: none
 - Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
-- Last closure: unit:1.6:1
-- Next: open 1.7 · next eligible: 1.7
+- Last closure: unit:1.7:1
+- Next: open 1.8 · next eligible: 1.8
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -108,6 +108,8 @@ none
 - Do not use go-ftw (D24). Do not use the Grafana `toJson`/`ternary` template funcs (R6).
 - Do not expect `aws wafv2 get-web-acl` / `describe-managed-rule-group` to work: IAM `enforce-mfa` explicit deny. Optional R1 check (not a gate): `aws sts get-session-token --serial-number <mfa-arn> --token-code <otp>`, export the creds, then run `scripts/fetch-aws-rulegroups.sh`. If priorities differ, reorder the catalog groups (plan revision).
 - Do not let an expired CRL stay on the ingress: nginx then rejects every node (R10).
+- Do not expect `nginx -s reload` to reopen the ModSecurity audit log (handles keyed by path survive reloads); rotation flips the audit slot (1.7). `nginx -s reload` is asynchronous: wait on `127.0.0.1:8090/__rev` (1.5).
+- Do not log `$request_method` (GET after the error_page redirect of a block); use `$waf_method` (1.7).
 
 ## 11. Board
 | Phase | Status | Attempt | Sub-phases | Closure ref |
@@ -130,7 +132,7 @@ Phase 1 (expanded):
 | 1.4 | 1.3 | DONE | 1 | agent-1 | unit:1.4:1 |
 | 1.5 | 1.4 | DONE | 1 | agent-1 | unit:1.5:1 |
 | 1.6 | 1.5 | DONE | 1 | agent-1 | unit:1.6:1 |
-| 1.7 | 1.6 | TODO | 1 | agent-1 | |
+| 1.7 | 1.6 | DONE | 1 | agent-1 | unit:1.7:1 |
 | 1.8 | 1.7 | TODO | 1 | agent-1 | |
 | 1.9 | 1.8 | TODO | 1 | agent-1 | |
 | P1 | 1.1–1.9 | TODO | 1 | agent-1 | |

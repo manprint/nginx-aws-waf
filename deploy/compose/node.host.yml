@@ -1,3 +1,5 @@
 services:
   waf:
     network_mode: host
+  vector:
+    network_mode: host

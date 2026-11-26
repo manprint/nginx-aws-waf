@@ -1,0 +1,8 @@
+[Unit]
+Description=Rotate WAF node logs and prune raw JSONL (wafctl logs rotate)
+After=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/wafctl
+ExecStart=/usr/local/bin/wafctl logs rotate

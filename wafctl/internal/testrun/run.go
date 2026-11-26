@@ -27,6 +27,7 @@ type Runner struct {
 	ListsDir  string            // for xff "@list:NAME"
 	Hosts     map[string]string // site id → Host header
 	Wait      time.Duration
+	RunID     string // set by Run
 	client    *http.Client
 }
 
@@ -148,6 +149,7 @@ func (r *Runner) Run(cases []Case) ([]Result, error) {
 		off = st.Size()
 	}
 	rid := runID()
+	r.RunID = rid
 	statuses := make([]int, len(cases))
 	errs := make([]error, len(cases))
 	for i := range cases {
@@ -220,7 +222,7 @@ func evaluate(c *Case, status int, sendErr error, rec Record, idx map[int]IndexE
 }
 
 // Print writes results as text or json; returns the number of failures.
-func Print(w io.Writer, res []Result, format string) int {
+func Print(w io.Writer, res []Result, format, runID string) int {
 	fails := 0
 	for _, r := range res {
 		if !r.OK {
@@ -230,7 +232,7 @@ func Print(w io.Writer, res []Result, format string) int {
 	if format == "json" {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		_ = enc.Encode(map[string]any{"results": res, "passed": len(res) - fails, "total": len(res)})
+		_ = enc.Encode(map[string]any{"run_id": runID, "results": res, "passed": len(res) - fails, "total": len(res)})
 		return fails
 	}
 	for _, r := range res {

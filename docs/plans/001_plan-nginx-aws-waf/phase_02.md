@@ -219,8 +219,9 @@ http {
   client_body_buffer_size 128k;
   resolver 127.0.0.11 ipv6=off valid=10s;          # only when node.network=bridge
   map "" $waf_node { default "<node_id>"; }         # verified in snippets/nginx-probe.conf (set for every request, also early 400s)
+  map $request $waf_method { "~^(?<m>[A-Za-z]+) " $m; default $request_method; }   # 1.7 fix: error_page redirects turn $request_method into GET
   map $http_upgrade $connection_upgrade { default upgrade; '' close; }
-  log_format waf_json escape=json '<exact format string from snippets/nginx-probe.conf>';
+  log_format waf_json escape=json '<exact format string from snippets/nginx-probe.conf, with "method":"$waf_method">';
   access_log /var/log/waf/access.log waf_json;
   limit_req_zone $binary_remote_addr zone=rl_<site>:10m rate=<ceil(limit*60/window)>r/m;   # per site with rate_limit
   modsecurity on;
@@ -567,7 +568,7 @@ Render first produces content with the placeholder `/etc/waf/runtime/REV`, hashe
       In host mode `network_mode: host` (node.host.yml); in bridge mode network `lab`.
     - `wafctl logs rotate [--max-size 512MiB] [--keep-hours 24] [--raw-days 7]`:
       1. For `access.log`, `audit.log` and `error.log` larger than max-size: rename to `<name>.<YYYYMMDDTHHMMSSZ>`.
-      2. If anything was renamed: Exec `nginx -s reopen` and then `nginx -s reload` (the reload reopens the ModSecurity audit log).
+      2. If anything was renamed: Exec `nginx -s reopen`. If `audit.log` was renamed: flip the audit slot in `$WAF_DATA_DIR/state/audit-slot` (0↔1) and run apply (reload). Verified in 1.7: libmodsecurity keys open log files by path string and keeps them open across reloads, so a plain reload keeps writing the renamed file; slot 1 renders `SecAuditLog /var/log/waf//audit.log` (same file, different key), which opens a fresh `audit.log` and closes the old handle. Lossless, no restart. On apply failure the slot is restored.
       3. Delete rotated files older than keep-hours.
       4. Delete `raw/<YYYY-MM-DD>` dirs older than raw-days (UTC).
     - systemd: `wafctl-logs.timer`, `OnCalendar=hourly`.

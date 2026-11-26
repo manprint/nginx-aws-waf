@@ -76,7 +76,7 @@ func cmdTest(args []string) int {
 		if err != nil {
 			return fail("%v", err)
 		}
-		if testrun.Print(os.Stdout, res, *format) > 0 || len(res) == 0 {
+		if testrun.Print(os.Stdout, res, *format, r.RunID) > 0 || len(res) == 0 {
 			return 1
 		}
 		return 0
@@ -112,7 +112,7 @@ func cmdTest(args []string) int {
 		}
 		x := res[0]
 		if *format == "json" {
-			testrun.Print(os.Stdout, res, "json")
+			testrun.Print(os.Stdout, res, "json", r.RunID)
 			return 0
 		}
 		if x.Summary == "" {

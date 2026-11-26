@@ -24,6 +24,7 @@ type Options struct {
 	Version     string
 	RuntimeRoot string // "/etc/waf/runtime"
 	Home        string // WAF_HOME (data and static files); default env.Home()
+	AuditSlot   int    // 0|1, see AuditLogPath; flipped by `wafctl logs rotate`
 }
 
 // Output is a rendered runtime tree (paths relative to the runtime dir).

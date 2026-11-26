@@ -56,7 +56,7 @@ func (r *renderer) mainConf() (string, error) {
 	}
 	l.E("SecAuditLogFormat JSON")
 	l.E("SecAuditLogType Serial")
-	l.E("SecAuditLog /var/log/waf/audit.log")
+	l.E("SecAuditLog " + AuditLogPath(r.opt.AuditSlot))
 	l.E("SecAuditLogParts ABCFHZ")
 	l.E("SecAuditLogFileMode 0644")
 	if n.GeoIP.Enabled {
@@ -202,3 +202,13 @@ SecRule TX:mode "@streq enforce" "t:none"
 SecRule TX:term "@eq 0" "id:1900930,phase:2,deny,status:403,nolog,auditlog,msg:'AWSWAF_DEFAULT_BLOCK',chain"
 SecRule TX:default_action "@streq block" "t:none,chain"
 SecRule TX:mode "@streq enforce" "t:none"`
+
+// AuditLogPath returns the audit log path for a rotation slot. libmodsecurity keys open
+// log files by path string and keeps them open across nginx reloads, so log rotation
+// flips the slot: the other spelling of the same path makes a reload open a fresh file.
+func AuditLogPath(slot int) string {
+	if slot%2 == 1 {
+		return "/var/log/waf//audit.log"
+	}
+	return "/var/log/waf/audit.log"
+}

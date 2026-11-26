@@ -1,0 +1,9 @@
+[Unit]
+Description=Run wafctl logs rotate hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

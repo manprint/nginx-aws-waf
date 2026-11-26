@@ -27,6 +27,7 @@ COMPOSE_NODE := docker compose -p waf -f deploy/compose/node.yml -f deploy/compo
 lab-min-up: wafctl lists ## start the minimal lab (WAF node + echo)
 	mkdir -p .run/runtime .run/logs .run/certs .run/geoip .run/raw .run/vector
 	./wafctl/bin/wafctl apply
+	$(COMPOSE_NODE) up -d --build --wait
 
 lab-min-down: ## stop the minimal lab
 	$(COMPOSE_NODE) down

@@ -64,8 +64,28 @@ func Prepare(configDir string, now time.Time) (*Prepared, error) {
 	for _, n := range created {
 		p.Warnings = append(p.Warnings, fmt.Sprintf("list %s missing; created placeholder in %s", n, lists))
 	}
-	p.Out, err = render.Render(cfg, cat, p.Bypass, render.Options{Now: now, Version: version.Version})
+	p.Out, err = render.Render(cfg, cat, p.Bypass, render.Options{Now: now, Version: version.Version, AuditSlot: ReadAuditSlot(env.DataDir())})
 	return p, err
+}
+
+// AuditSlotPath is the file holding the audit log slot (see render.AuditLogPath).
+func AuditSlotPath(dataDir string) string { return filepath.Join(dataDir, "state", "audit-slot") }
+
+// ReadAuditSlot returns 0 or 1 (0 when the file is missing).
+func ReadAuditSlot(dataDir string) int {
+	b, err := os.ReadFile(AuditSlotPath(dataDir))
+	if err == nil && strings.TrimSpace(string(b)) == "1" {
+		return 1
+	}
+	return 0
+}
+
+// WriteAuditSlot stores the slot.
+func WriteAuditSlot(dataDir string, slot int) error {
+	if err := os.MkdirAll(filepath.Dir(AuditSlotPath(dataDir)), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(AuditSlotPath(dataDir), []byte(fmt.Sprintf("%d\n", slot%2)), 0o644)
 }
 
 // Options tunes Apply.
