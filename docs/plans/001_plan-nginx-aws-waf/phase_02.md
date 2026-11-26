@@ -60,7 +60,7 @@ SecRuleEngine On
 SecRequestBodyAccess On
 SecRequestBodyLimit 8192
 SecRequestBodyNoFilesLimit 8192
-SecRequestBodyInMemoryLimit 131072
+# (SecRequestBodyInMemoryLimit is rejected by libmodsecurity 3 — nginx client_body_buffer_size 128k governs it)
 SecRequestBodyLimitAction ProcessPartial
 SecResponseBodyAccess Off
 SecPcreMatchLimit 100000
@@ -118,6 +118,15 @@ SecRule TX:mode "@streq enforce" "t:none"
 SecRule TX:term "@eq 0" "id:1900930,phase:2,deny,status:403,nolog,auditlog,msg:'AWSWAF_DEFAULT_BLOCK',chain"
 SecRule TX:default_action "@streq block" "t:none,chain"
 SecRule TX:mode "@streq enforce" "t:none"
+```
+
+With `node.audit.scope=relevant` (nginx-only), the evaluator differs only in the SUMMARY rule: four helper lines are inserted before it and SUMMARY becomes conditional, so the audit record is written only for requests with a detector hit, a failure or a default block (probed 26-11-2026: `&TX:/^hit_/` works; a non-matching request writes no audit record):
+```
+SecRule &TX:/^hit_/ "@gt 0" "id:1900890,phase:2,pass,nolog,setvar:tx.relevant=1"
+SecRule TX:fail "!@streq none" "id:1900891,phase:2,pass,nolog,setvar:tx.relevant=1"
+SecRule TX:term "@eq 0" "id:1900892,phase:2,pass,nolog,chain"
+SecRule TX:default_action "@streq block" "t:none,setvar:tx.relevant=1"
+SecRule TX:relevant "@eq 1" "id:1900900,phase:2,pass,nolog,auditlog,msg:'AWSWAF_SUMMARY',…same logdata…"
 ```
 
 ### Site file `<R>/modsec/sites/<site>.conf` (exact)

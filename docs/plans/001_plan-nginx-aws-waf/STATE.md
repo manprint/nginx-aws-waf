@@ -10,9 +10,9 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Stop latch: none
 - Scope: plan 001 · RUNNING · overrides none
 - Unit: none
-- Base: HEAD unborn + tree 6814df797d8c2d7f67d990d01abb1b0f936221aa · branch main · last WIP tree none
-- Last closure: unit:P0:1
-- Next: open 1.1 · next eligible: 1.1
+- Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
+- Last closure: unit:1.1:1
+- Next: open 1.2 · next eligible: 1.2
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -113,7 +113,7 @@ none
 | Phase | Status | Attempt | Sub-phases | Closure ref |
 |-------|--------|---------|------------|-------------|
 | 0 | DONE | 1 | 0.1–0.5 | unit:P0:1 |
-| 1 | TODO | 1 | 1.1–1.9 | — |
+| 1 | IN_PROGRESS | 1 | 1.1–1.9 | — |
 | 2 | TODO | 1 | 2.1–2.5 | — |
 | 3 | TODO | 1 | 3.1–3.6 | — |
 | 4 | TODO | 1 | 4.1–4.4 | — |
@@ -124,7 +124,7 @@ none
 Phase 1 (expanded):
 | ID | Depends | Status | Attempt | Assigned | Ref / note |
 |----|---------|--------|---------|----------|------------|
-| 1.1 | P0 | TODO | 1 | agent-1 | |
+| 1.1 | P0 | DONE | 1 | agent-1 | unit:1.1:1 |
 | 1.2 | 1.1 | TODO | 1 | agent-1 | |
 | 1.3 | 1.2 | TODO | 1 | agent-1 | |
 | 1.4 | 1.3 | TODO | 1 | agent-1 | |
