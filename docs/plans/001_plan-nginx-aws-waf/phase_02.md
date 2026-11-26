@@ -518,7 +518,7 @@ Render first produces content with the placeholder `/etc/waf/runtime/REV`, hashe
   - Corpus content (minimum; every case from `reference-cases.py`, mapped to sites):
     - **`crs.yaml`, `kbi.yaml`, `iprep.yaml`** on site `demo`. They contain all reference cases except sqli/anonip, plus:
       - `iprep-v6`: xff `2001:db8:bad::1` → 403 AWSManagedIPReputationList.
-      - `kbi-host-localhost` uses `request.host: localhost`.
+      - `kbi-host-localhost` uses `request.host: localhost` (lab site demo lists `localhost` and `127.0.0.1` in `server_names`, because unknown hosts get 444; `[::1]` is not a valid server name, so the IPv6 variant is `kbi-host-loopback-v4` with host `127.0.0.1:8080`).
       - `clean-get`, `clean-json-rpc` → 200 Default_Action.
     - **`sqli.yaml`, `anonip.yaml`** on site `strict`. The anonip case reads the first non-comment IP of `.run/lists/AnonymousIPList.txt` via the special value `xff: "@list:AnonymousIPList.txt"`, resolved by the runner from `$WAF_DATA_DIR/lists`.
     - **`engine.yaml`:**

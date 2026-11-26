@@ -1,6 +1,6 @@
 version: 1
 site_id: demo
-server_names: [demo.lab.test]
+server_names: [demo.lab.test, localhost, 127.0.0.1]
 app: generic
 upstream: {servers: ["echo:8081"]}
 client_ip: {source: xff, trusted_proxies: ["0.0.0.0/0", "::/0"]}

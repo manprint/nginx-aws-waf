@@ -1,0 +1,119 @@
+# Evaluator semantics: first-wins (I-1), count (I-2), shadow (I-3), labels, scope-down, path overrides, body limits, default action.
+version: 1
+cases:
+- id: first-wins
+  site: demo
+  request:
+    host: localhost
+    headers:
+      User-Agent: ''
+  expect:
+    status: 403
+    terminating_rule: NoUserAgent_HEADER
+    matches:
+    - NoUserAgent_HEADER
+    - Host_localhost_HEADER
+- id: count-override
+  site: tuned
+  request:
+    method: POST
+    path: /web/dataset/call_kw
+    body_repeat:
+      char: x
+      count: 9000
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+    matches:
+    - SizeRestrictions_BODY
+- id: label-rule-block
+  site: tuned
+  request:
+    method: POST
+    path: /other
+    body_repeat:
+      char: x
+      count: 9000
+  expect:
+    status: 403
+    terminating_rule: BlockLargeBodyOutsideRpc
+    matches:
+    - SizeRestrictions_BODY
+- id: scope-down-out
+  site: tuned
+  request:
+    path: /static-ok/x
+    headers:
+      X-Api-Version: ${jndi:ldap://e/a}
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+    matches:
+    - Log4JRCE_HEADER
+- id: scope-down-in
+  site: tuned
+  request:
+    path: /x
+    headers:
+      X-Api-Version: ${jndi:ldap://e/a}
+  expect:
+    status: 403
+    terminating_rule: Log4JRCE_HEADER
+- id: path-override-in
+  site: tuned
+  request:
+    path: /files/a.log
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: path-override-out
+  site: tuned
+  request:
+    path: /a.log
+  expect:
+    status: 403
+    terminating_rule: RestrictedExtensions_URIPATH
+- id: body-limit-16k
+  site: tuned
+  request:
+    method: POST
+    path: /web/dataset/call_kw
+    body_repeat: &id001
+      char: x
+      count: 12000
+      prefix: a=
+      suffix: <script>alert(1)</script>
+  expect:
+    status: 403
+    terminating_rule: CrossSiteScripting_BODY
+- id: body-limit-8k
+  site: demo
+  request:
+    method: POST
+    path: /web/dataset/call_kw
+    body_repeat: *id001
+  expect:
+    status: 403
+    terminating_rule: SizeRestrictions_BODY
+- id: shadow-noua
+  site: shadow
+  request:
+    headers:
+      User-Agent: ''
+  expect:
+    status: 200
+    terminating_rule: NoUserAgent_HEADER
+- id: allowlist-public
+  site: allowlist
+  request:
+    path: /public/x
+  expect:
+    status: 200
+    terminating_rule: AllowPublic
+- id: allowlist-other
+  site: allowlist
+  request:
+    path: /private/x
+  expect:
+    status: 403
+    terminating_rule: Default_Action

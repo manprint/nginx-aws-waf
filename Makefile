@@ -30,3 +30,7 @@ lab-min-up: wafctl lists ## start the minimal lab (WAF node + echo)
 
 lab-min-down: ## stop the minimal lab
 	$(COMPOSE_NODE) down
+
+.PHONY: test-e2e
+test-e2e: lab-min-up ## run the request corpus against the lab node (G-U16)
+	./wafctl/bin/wafctl test run --suite tests/corpus

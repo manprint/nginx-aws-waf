@@ -1,0 +1,25 @@
+# SQL database group (site strict: profile strict enables it).
+version: 1
+cases:
+- id: sqli-query
+  site: strict
+  request:
+    path: /?id=1'%20OR%20'1'='1
+  expect:
+    status: 403
+    terminating_rule: SQLi_QUERYARGUMENTS
+- id: sqli-body
+  site: strict
+  request:
+    method: POST
+    body: id=1 union all select password from users
+  expect:
+    status: 403
+    terminating_rule: SQLi_BODY
+- id: sqli-clean
+  site: strict
+  request:
+    path: /?id=42
+  expect:
+    status: 200
+    terminating_rule: Default_Action

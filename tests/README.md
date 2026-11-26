@@ -1,0 +1,49 @@
+# Test
+
+Tutti i comandi partono dalla root del repo dopo `source scripts/lab-env.sh`.
+
+| Cosa | Comando | Note |
+|---|---|---|
+| Unit test Go | `make test-unit` | `cd wafctl && go test ./...` |
+| Corpus richieste | `make test-e2e` | avvia il lab minimo e lancia `wafctl test run --suite tests/corpus` |
+| Smoke del nodo | `tests/e2e/smoke.sh` | 200/403/444, log che crescono, T-R12 |
+| Apply/bypass/explain | `tests/e2e/apply.sh` | I-5: un apply fallito non tocca la config attiva |
+
+## Corpus (`tests/corpus/*.yaml`)
+
+Ogni caso invia una richiesta al nodo (default `http://127.0.0.1:8080`) con header
+`X-Waf-Test: <runid>-<id>`; il runner poi legge l'audit log
+(`$WAF_DATA_DIR/logs/audit.log`), prende `AWSWAF_SUMMARY` e le regole matchate e
+confronta con `expect`.
+
+```yaml
+version: 1
+cases:
+  - id: crs-xss-query            # univoco in tutta la suite
+    site: demo                   # Host = primo server_name del sito, salvo request.host
+    request:
+      method: GET                # default GET
+      path: "/?q=<script>alert(1)</script>"   # inviato così com'è (nessuna normalizzazione)
+      host: localhost            # opzionale
+      headers: {User-Agent: ""}  # valore "" = header rimosso
+      xff: 198.51.100.10         # default; "@list:AnonymousIPList.txt" = primo IP della lista
+      body: "a=b"                # oppure body_repeat: {char: x, count: 9000, prefix: "a=", suffix: ""}
+      content_type: ""           # default form-urlencoded se c'è un body
+      multipart: {field: f, filename: x.html, content: "..."}
+      chunked: false
+    expect:
+      status: 403
+      terminating_rule: CrossSiteScripting_QUERYARGUMENTS   # o nome custom rule, o Default_Action
+      matches: [CrossSiteScripting_QUERYARGUMENTS]          # sottoinsieme delle regole matchate (anche count)
+```
+
+Uscita: `OK|FAIL <id> status=… term=… matches=…` e `PASSED n/m`; exit 1 se un caso
+fallisce o manca il record di audit. `--filter S` limita ai casi il cui id contiene `S`,
+`--format json` per l'output macchina.
+
+Richiesta singola: `wafctl test request --site demo --path '/?q=<script>' -H 'X-A: b'`.
+
+I siti di lab sono in `lab/config/sites/` (demo, strict, tuned, shadow, allowlist);
+`demo` ha anche i nomi `localhost` e `127.0.0.1` per i casi Host_localhost_HEADER.
+Il nome IPv6 `[::1]` non è un server_name valido, quindi la variante IPv6 di quel caso
+non è coperta dal corpus (lo copre la regola, verificata nel prototipo).

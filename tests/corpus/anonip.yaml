@@ -1,0 +1,10 @@
+# Anonymous IP group (site strict). xff "@list:<file>" = first entry of $WAF_DATA_DIR/lists/<file>.
+version: 1
+cases:
+- id: anonip-anonymous
+  site: strict
+  request:
+    xff: '@list:AnonymousIPList.txt'
+  expect:
+    status: 403
+    terminating_rule: AnonymousIPList

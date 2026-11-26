@@ -1,0 +1,31 @@
+# IP reputation group (site demo). The lab list custom-reputation.txt holds 203.0.113.0/24 and 2001:db8:bad::/48.
+version: 1
+cases:
+- id: iprep-v4
+  site: demo
+  request:
+    xff: 203.0.113.7
+  expect:
+    status: 403
+    terminating_rule: AWSManagedIPReputationList
+- id: iprep-v6
+  site: demo
+  request:
+    xff: 2001:db8:bad::1
+  expect:
+    status: 403
+    terminating_rule: AWSManagedIPReputationList
+- id: iprep-recon
+  site: demo
+  request:
+    xff: '@list:AWSManagedReconnaissanceList.txt'
+  expect:
+    status: 403
+    terminating_rule: AWSManagedReconnaissanceList
+- id: iprep-clean-v6
+  site: demo
+  request:
+    xff: 2001:db8:1::1
+  expect:
+    status: 200
+    terminating_rule: Default_Action
