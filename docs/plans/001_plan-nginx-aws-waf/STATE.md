@@ -11,8 +11,8 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Scope: plan 001 · RUNNING · overrides none
 - Unit: none
 - Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
-- Last closure: unit:1.9:1
-- Next: open P1 · next eligible: P1
+- Last closure: unit:P1:1
+- Next: open 2.1 · next eligible: 2.1
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -115,27 +115,25 @@ none
 | Phase | Status | Attempt | Sub-phases | Closure ref |
 |-------|--------|---------|------------|-------------|
 | 0 | DONE | 1 | 0.1–0.5 | unit:P0:1 |
-| 1 | IN_PROGRESS | 1 | 1.1–1.9 | — |
-| 2 | TODO | 1 | 2.1–2.5 | — |
+| 1 | DONE | 1 | 1.1–1.9 | unit:P1:1 |
+| 2 | IN_PROGRESS | 1 | 2.1–2.5 | — |
 | 3 | TODO | 1 | 3.1–3.6 | — |
 | 4 | TODO | 1 | 4.1–4.4 | — |
 | 5 | TODO | 1 | 5.1–5.5 | — |
 | 6 | TODO | 1 | 6.1–6.5 | — |
 | PLAN | TODO | 1 | — | — |
 
-Phase 1 (expanded):
+Phase 1: DONE (unit:P1:1), 1.1–1.9 DONE attempt 1.
+
+Phase 2 (expanded):
 | ID | Depends | Status | Attempt | Assigned | Ref / note |
 |----|---------|--------|---------|----------|------------|
-| 1.1 | P0 | DONE | 1 | agent-1 | unit:1.1:1 |
-| 1.2 | 1.1 | DONE | 1 | agent-1 | unit:1.2:1 |
-| 1.3 | 1.2 | DONE | 1 | agent-1 | unit:1.3:1 |
-| 1.4 | 1.3 | DONE | 1 | agent-1 | unit:1.4:1 |
-| 1.5 | 1.4 | DONE | 1 | agent-1 | unit:1.5:1 |
-| 1.6 | 1.5 | DONE | 1 | agent-1 | unit:1.6:1 |
-| 1.7 | 1.6 | DONE | 1 | agent-1 | unit:1.7:1 |
-| 1.8 | 1.7 | DONE | 1 | agent-1 | unit:1.8:1 |
-| 1.9 | 1.8 | DONE | 1 | agent-1 | unit:1.9:1 |
-| P1 | 1.1–1.9 | TODO | 1 | agent-1 | |
+| 2.1 | P1 | TODO | 1 | agent-1 | |
+| 2.2 | 2.1 | TODO | 1 | agent-1 | |
+| 2.3 | 2.2 | TODO | 1 | agent-1 | |
+| 2.4 | 2.3 | TODO | 1 | agent-1 | |
+| 2.5 | 2.4 | TODO | 1 | agent-1 | |
+| P2 | 2.1–2.5 | TODO | 1 | agent-1 | |
 
 README obligation: 1.9 (README rewrite), then 2.5, 3.6, 4.4, 5.5 and 6.5 add sections.
 Open corrections: none. Open audits: none.

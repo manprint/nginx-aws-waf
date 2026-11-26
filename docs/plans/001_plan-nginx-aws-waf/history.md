@@ -90,3 +90,8 @@
 - Docs (Italian): README rewritten (purpose, quickstart, directory map, links); rules-spec §2 = D23 map, generated CRS detector table, D7/D8/D16 recorded, §7 items 3–4 resolved, stale rows (fail mode, overrides) updated; NEW docs/config-reference.md, docs/tuning.md, docs/operations.md.
 - Self-review against the D-table: D7 (raw path), D8 (body limits), D16 (logs), D19 (paths), D23 (IDs), fail mode/bypass/rotation behaviour checked against code (merge semantics, defaults, compat reasons, cert defaults).
 - G-U19: TestCAT3_ 1 PASS; docs reviewed.
+
+## P1 attempt 1 — DONE (26-11-2026 UTC, agent-1:opus)
+- G-P1 from a stopped lab (`make lab-min-down` first): `make test-unit` (7 packages ok) && `make lab-min-up` && `make test-e2e` (PASSED 62/62) && smoke.sh, apply.sh, joinlog.sh (ALL PASS each) → rc 0. G-PERF: GET 6363 rps p99 1.80 ms, POST 5143 rps p99 3.15 ms, exit 0. G-NGXT full + --modsec-only on the lab render: syntax ok, test successful. TestR* 11 PASS, no SKIP.
+- Review (agent-1, self-review): I-1 first-wins case; I-2 count-override (event action ALLOW, aws_default_action BLOCK = I-4); I-3 shadow event status 200, action ALLOW, shadow_action BLOCK; bypass e2e; I-5 T-A1 + apply.sh; I-6/I-7 T-L1 one event per case, `Z` timestamps; I-8 no secrets tracked. Integration render ↔ apply ↔ testrun ↔ Vector consistent (rules-index.json shared). Docs updated in 1.9 (README obligation met).
+- Plan corrections during the phase (all recorded in unit entries, none weakening): SecRequestBodyInMemoryLimit removed; audit.scope=relevant variant; nginx temp paths; echo healthcheck; reload wait on /__rev; lab localhost aliases; $waf_method; audit-slot rotation.
