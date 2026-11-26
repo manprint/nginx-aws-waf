@@ -10,3 +10,8 @@
 ## 0.2 attempt 1 — DONE (26-11-2026 UTC, agent-1:opus)
 - NEW: waf/catalog/rules.yaml (snippet minus line 1, diff empty), waf/data/{bad-bots 79, ec2-metadata 11, lfi-targets 11} lines, no comments/blank; waf/static/403.html + 500.html (CRLF via printf); waf/README.md.
 - G-U02 passed. self-review: catalog byte-identical; pages CRLF verified with od.
+
+## 0.3 attempt 1 — DONE (26-11-2026 UTC, agent-1:opus)
+- NEW wafctl module (go 1.27.3, yaml.v3 v3.0.1): internal/{version,env,catalog}, cmd/wafctl/{main.go,catalog.go} (`version`, `catalog list|show`).
+- G-U03: go vet clean; TestCAT1_, TestCAT2_ PASS (2/2); `catalog list | wc -l` = 56; unknown command → exit 2.
+- Additions within contract: `env.CatalogPath()`, `Catalog.Rules()`, duplicate group key check. self-review OK.
