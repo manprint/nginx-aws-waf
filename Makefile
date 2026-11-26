@@ -52,6 +52,14 @@ lab-reset: ## stop the full lab and delete its volumes (Odoo databases)
 lab-legit: ## Playwright legit Odoo flows through the WAF (G-U23)
 	tests/legit/run.sh shop12,shop14,shop16,shop18
 
+.PHONY: lab-attack
+lab-attack: ## nuclei + nikto against the Odoo sites (G-U24)
+	scripts/lab-attack.sh shop12,shop14,shop16,shop18
+
+.PHONY: lab-matrix
+lab-matrix: ## lab matrix (clickhouse local over today's raw logs) → build/lab/matrix.md
+	scripts/lab-matrix.sh
+
 .PHONY: test-odoo
 test-odoo: ## run the demo corpus against the four Odoo sites (G-U22)
 	@rc=0; for v in 12 14 16 18; do echo "== shop$$v"; ./wafctl/bin/wafctl test run --suite tests/corpus --filter-site demo --retarget demo=shop$$v --exceptions tests/odoo-exceptions.yaml || rc=1; done; exit $$rc

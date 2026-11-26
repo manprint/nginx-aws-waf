@@ -10,6 +10,22 @@ services:
     command: ["bash", "-lc", "npm ci --no-audit --no-fund && npx playwright test"]
     ipc: host
     networks: [lab]
+  nuclei:
+    image: projectdiscovery/nuclei:v3.11
+    profiles: [tools]
+    volumes:
+      - nuclei-templates:/root/nuclei-templates
+      - ../../build/lab:/out
+    networks: [lab]
+  nikto:
+    build: ../../lab/nikto
+    image: waf-lab-nikto:2.6.1
+    profiles: [tools]
+    volumes:
+      - ../../build/lab:/out
+    networks: [lab]
+volumes:
+  nuclei-templates:
 networks:
   lab:
     name: waf_lab
