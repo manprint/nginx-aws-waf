@@ -1,0 +1,79 @@
+# Operazioni sul nodo
+
+## Percorsi (D19)
+
+| Variabile | Contenuto |
+|---|---|
+| `$WAF_HOME` | questo repo (prodotto: catalogo, profili, compose, script) |
+| `$WAF_CONFIG_DIR` | config del nodo (repo git per nodo): `node.yaml`, `sites/`, `profiles/`, `pages/`, `state/` |
+| `$WAF_DATA_DIR` | dati: `runtime/<rev>`, `runtime/current`, `lists/`, `logs/`, `raw/<giorno>/`, `certs/<sito>/`, `geoip/`, `vector/`, `state/audit-slot` |
+
+Nel lab `source scripts/lab-env.sh` imposta `WAF_HOME`, `WAF_CONFIG_DIR=lab/config`,
+`WAF_DATA_DIR=.run` e il `PATH` per `wafctl`. In produzione le variabili stanno in
+`/etc/default/wafctl` (letto dalle unit systemd).
+
+Mount del container `waf`: `runtime` → `/etc/waf/runtime` (ro), `lists` → `/etc/waf/lists` (ro),
+`certs` → `/etc/waf/certs` (ro), `geoip` → `/etc/waf/geoip` (ro), `logs` → `/var/log/waf`.
+Certificati e chiavi non vanno mai in git.
+
+## Apply e rollback
+
+`wafctl apply`:
+
+1. valida (exit 2 se ci sono errori);
+2. renderizza in `runtime/<rev>` (rev = `YYYYMMDDTHHMMSSZ-<hash>`; una rev identica viene riusata);
+3. `nginx -t` sulla nuova rev: se fallisce la rev viene cancellata ed esce 1, la config attiva resta;
+4. sposta atomicamente il link `runtime/current`;
+5. `nginx -s reload` e attesa che i worker servano la nuova rev (`127.0.0.1:8090/__rev`), oppure avvio
+   del compose se il nodo è fermo;
+6. tiene le ultime 5 rev più quella attiva.
+
+Rollback manuale a una rev precedente:
+
+```bash
+ln -sfn <rev> $WAF_DATA_DIR/runtime/current.new && mv -T $WAF_DATA_DIR/runtime/current.new $WAF_DATA_DIR/runtime/current
+docker compose -p waf exec -T waf nginx -s reload -c /etc/waf/runtime/current/nginx/nginx.conf
+```
+
+Il modo normale resta correggere la config (git revert nel repo del nodo) e rifare `wafctl apply`.
+
+## Unit systemd (`deploy/systemd/`)
+
+| Unit | Quando | Cosa |
+|---|---|---|
+| `wafctl-bypass-expire.timer` / `.service` | ogni minuto | `wafctl bypass expire`: rimuove i bypass scaduti e riapplica solo se è cambiato qualcosa |
+| `wafctl-logs.timer` / `.service` | ogni ora | `wafctl logs rotate` |
+
+Installazione: copiare i file in `/etc/systemd/system/`, `wafctl` in `/usr/local/bin/`, poi
+`systemctl daemon-reload && systemctl enable --now wafctl-bypass-expire.timer wafctl-logs.timer`.
+
+## Log e rotazione
+
+| File | Contenuto |
+|---|---|
+| `logs/access.log` | access log nginx JSON, una riga per richiesta (UTC) |
+| `logs/audit.log` | audit log ModSecurity JSON (header e body della richiesta, match, `AWSWAF_SUMMARY`) |
+| `logs/error.log` | errori nginx e messaggi ModSecurity |
+| `raw/<YYYY-MM-DD>/events.jsonl` | eventi uniti da Vector (un evento per richiesta) |
+| `raw/<YYYY-MM-DD>/matches.jsonl` | una riga per regola matchata |
+
+`wafctl logs rotate [--max-size 512MiB] [--keep-hours 24] [--raw-days 7]`: rinomina i log oltre la
+soglia in `<nome>.<YYYYMMDDTHHMMSSZ>`, fa `nginx -s reopen`, cancella i ruotati più vecchi di
+`keep-hours` e le directory `raw/` più vecchie di `raw-days`.
+
+Nota sull'audit log: libmodsecurity tiene aperti i file per nome anche attraverso i reload, quindi
+un reload da solo continuerebbe a scrivere nel file rinominato. Quando ruota `audit.log`, `wafctl`
+alterna lo "slot" (`state/audit-slot`: `SecAuditLog /var/log/waf/audit.log` ↔
+`/var/log/waf//audit.log`, stesso file con un nome diverso) e fa un apply: il reload apre un
+`audit.log` nuovo senza perdere righe e senza riavviare nginx.
+
+## Liste IP
+
+Le liste usate dalle regole di reputazione stanno in `$WAF_DATA_DIR/lists/*.txt` (montate in
+`/etc/waf/lists`). Nel lab `make lists` le copia da `data/ip-reputation/` (`make fetch` le scarica).
+L'aggiornamento automatico (`wafctl lists`) arriva nella fase 6 (unità 6.4); dopo un cambio delle
+liste serve un reload (`wafctl apply`).
+
+## Benchmark
+
+Vedi `docs/performance.md` (`scripts/bench.sh`).

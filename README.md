@@ -1,14 +1,56 @@
 # nginx_aws_waf
 
-Simulazione locale di AWS WAF davanti a un ALB, con la web ACL di default dell'integrazione
-one-click ALB:
+Simulatore della web ACL AWS WAF "one-click" per ALB (`AWSManagedRulesAmazonIpReputationList` →
+`AWSManagedRulesCommonRuleSet` → `AWSManagedRulesKnownBadInputsRuleSet`) su nginx +
+libmodsecurity v3 in Docker. Due usi:
 
-- `AWSManagedRulesAmazonIpReputationList`
-- `AWSManagedRulesCommonRuleSet`
-- `AWSManagedRulesKnownBadInputsRuleSet`
+1. **laboratorio di tuning** prima di andare su AWS: stesse regole, nomi, label e azioni di
+   default; ogni regola può andare in Count come su AWS; ogni elemento di configurazione è
+   marcato `aws-compatible` o `nginx-only`;
+2. **WAF di produzione** per nodi EC2 con nginx senza ALB (circa 20 nodi), con log completi,
+   statistiche, dashboard e inoltro mTLS verso un nodo centrale.
 
-Motore: nginx + libmodsecurity v3 (immagine `owasp/modsecurity-crs`), regole custom che
-riproducono nomi, label e azioni delle regole AWS. Pattern AWS non pubblici → comportamento approssimato.
+Il catalogo `waf/catalog/rules.yaml` è la fonte unica delle regole; `wafctl` (Go) valida la
+configurazione, la renderizza in config nginx/ModSecurity, la applica e la testa.
+I pattern AWS non pubblici sono approssimati (colonna `fidelity` del catalogo).
+
+## Quickstart (lab)
+
+```sh
+source scripts/lab-env.sh   # WAF_HOME, WAF_CONFIG_DIR=lab/config, WAF_DATA_DIR=.run, PATH
+make fetch                  # liste IP, documentazione AWS, sorgenti CRS
+make lab-min-up             # build wafctl, liste, apply: nodo WAF + echo + vector (porta 8080)
+make test-e2e               # corpus di richieste (tests/corpus), atteso "PASSED n/n"
+tests/e2e/smoke.sh          # smoke test del nodo
+wafctl explain tuned        # come è configurato un sito
+make lab-min-down
+```
+
+## Mappa delle directory
+
+| Percorso | Contenuto |
+|---|---|
+| `waf/` | catalogo regole, file dati, pagine 403/500, Dockerfile del motore |
+| `wafctl/` | CLI Go (`validate`, `render`, `apply`, `diff`, `explain`, `bypass`, `test`, `logs`, `catalog`) |
+| `profiles/` | profili di prodotto (`aws-default`, `shadow`, `strict`) |
+| `lab/config/` | configurazione del nodo di lab (`node.yaml`, `sites/`) |
+| `deploy/compose/` | compose del nodo (`node.yml` + `node.host.yml` / `node.bridge.yml`, lab) |
+| `deploy/vector/` | pipeline Vector del nodo (eventi uniti in JSONL) |
+| `deploy/systemd/` | timer per bypass e rotazione log |
+| `tests/` | corpus di richieste ed e2e (`tests/README.md`) |
+| `scripts/` | fetch, `lab-env.sh`, `ngx-test.sh`, `bench.sh` |
+| `data/` | liste IP e definizioni AWS scaricate |
+| `docs/` | documentazione (sotto) e piani (`docs/plans/`) |
+
+## Documentazione
+
+- [docs/rules-spec.md](docs/rules-spec.md) — regole AWS e come sono riprodotte, schema ID
+- [docs/config-reference.md](docs/config-reference.md) — tutte le chiavi di configurazione
+- [docs/tuning.md](docs/tuning.md) — flusso shadow → count + label rule → enforce, bypass
+- [docs/operations.md](docs/operations.md) — percorsi, apply/rollback, systemd, log
+- [docs/performance.md](docs/performance.md) — benchmark
+- [tests/README.md](tests/README.md) — test e corpus
+- [waf/README.md](waf/README.md) — motore e catalogo
 
 ## Risorse esterne
 

@@ -84,3 +84,9 @@
 ## 1.8 attempt 1 — DONE (26-11-2026 UTC, agent-1:opus)
 - NEW scripts/bench.sh, tests/bench/rpc.json (353 B, generated with the plan's one-liner), docs/performance.md.
 - G-PERF: 3 runs, all exit 0. Median GET 6101 rps p99 2.32 ms; POST 5282 rps p99 2.75 ms (D29: ≥3500/≥3000, ≤5 ms). worker_processes 2, logs bind-mounted, Vector running.
+
+## 1.9 attempt 1 — DONE (26-11-2026 UTC, agent-1:opus)
+- `wafctl catalog list --format markdown` (internal/catalog/markdown.go) + TestCAT3_ (exact header, one row per rule).
+- Docs (Italian): README rewritten (purpose, quickstart, directory map, links); rules-spec §2 = D23 map, generated CRS detector table, D7/D8/D16 recorded, §7 items 3–4 resolved, stale rows (fail mode, overrides) updated; NEW docs/config-reference.md, docs/tuning.md, docs/operations.md.
+- Self-review against the D-table: D7 (raw path), D8 (body limits), D16 (logs), D19 (paths), D23 (IDs), fail mode/bypass/rotation behaviour checked against code (merge semantics, defaults, compat reasons, cert defaults).
+- G-U19: TestCAT3_ 1 PASS; docs reviewed.

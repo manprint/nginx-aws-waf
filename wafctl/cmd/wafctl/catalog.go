@@ -30,7 +30,7 @@ func loadCatalog() (*catalog.Catalog, error) {
 
 func cmdCatalog(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: wafctl catalog list [--group KEY] [--format table|json] | show <name|id>")
+		fmt.Fprintln(os.Stderr, "usage: wafctl catalog list [--group KEY] [--format table|json|markdown] | show <name|id>")
 		return 2
 	}
 	cat, err := loadCatalog()
@@ -41,7 +41,7 @@ func cmdCatalog(args []string) int {
 	case "list":
 		fs := flag.NewFlagSet("catalog list", flag.ContinueOnError)
 		group := fs.String("group", "", "group key")
-		format := fs.String("format", "table", "table|json")
+		format := fs.String("format", "table", "table|json|markdown")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
@@ -69,6 +69,8 @@ func cmdCatalog(args []string) int {
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
 			_ = enc.Encode(out)
+		case "markdown":
+			catalog.WriteMarkdown(os.Stdout, rules)
 		case "table":
 			tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintln(tw, "ID\tGROUP\tNAME\tDEFAULT\tFIDELITY\tDETECTORS")

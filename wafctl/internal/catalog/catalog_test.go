@@ -94,3 +94,22 @@ groups:
 		}
 	}
 }
+
+func TestCAT3_MarkdownHeader(t *testing.T) {
+	cat, err := Load("../../../waf/catalog/rules.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	WriteMarkdown(&b, cat.Rules())
+	lines := strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
+	if lines[0] != "| ID | Group | Rule | Default | Fidelity | Detectors(vars → op) |" {
+		t.Errorf("header = %q", lines[0])
+	}
+	if len(lines) != 2+len(cat.Rules()) {
+		t.Errorf("lines = %d, rules = %d", len(lines), len(cat.Rules()))
+	}
+	if !strings.Contains(b.String(), "| 1200010 | crs | NoUserAgent_HEADER | block |") {
+		t.Error("NoUserAgent row missing")
+	}
+}

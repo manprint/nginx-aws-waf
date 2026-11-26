@@ -8,16 +8,16 @@ la colonna **Impl.** indica l'approssimazione scelta. Legenda: ✅ fedele, ≈ a
 | Parametro | Default AWS | Fonte | Impl. ModSecurity/nginx |
 |---|---|---|---|
 | Default action web ACL | Allow | one-click | `SecDefaultAction` pass |
-| Body inspection limit | 8 KB (8 192 B), opz. 16/32/48/64 KB | body-inspection-limit.md | `SecRequestBodyLimit 8192` + `SecRequestBodyLimitAction ProcessPartial` (parametrizzato `WAF_BODY_LIMIT`) |
+| Body inspection limit | 8 KB (8 192 B); per ALB configurabile solo 8/16/32/48/64 KB | body-inspection-limit.md | `SecRequestBodyLimit` = `body_limit` del sito + `ProcessPartial`. Valori 8192/16384/32768/49152/65536 = aws-compatible, altri (fino a 1 MiB) = nginx-only (D8). `SizeRestrictions_BODY` resta fisso a > 8192 come in AWS |
 | Oversize handling managed rules | Continue (ispeziona solo la parte entro il limite) | oversize-components.md | ProcessPartial ✅ |
 | Header ispezionabili | primi 8 KB **o** primi 200 header | oversize-components.md | ≈ ispezione di tutti gli header (troncamento non emulato) |
 | Cookie ispezionabili | primi 8 KB **o** primi 200 cookie | oversize-components.md | ≈ come sopra |
 | Block response | `403 Forbidden`, body HTML default, header `Server: awselb/2.0` | block-response.md | `SecRuleEngine On` + `error_page 403` statico ≈ |
-| WAF irraggiungibile | ALB risponde 500 (fail-open off) | alb-waf-integration.md | fuori scope |
+| WAF irraggiungibile | ALB risponde 500 (fail-open off) | alb-waf-integration.md | errore interno del motore → 500; limite PCRE / errore body → `fail` per sito (default closed = 500, `open` = prosegue) |
 | Ordine rule group | priority 0 IpReputation → 1 Common → 2 KnownBadInputs | ⚠ assunto, da verificare con `get-web-acl` | ordine file di include |
 | Valutazione | regole in ordine; prima regola **Block** termina; **Count** aggiunge label e prosegue | rule-actions.md | tutte le regole in **phase:2** (così l'ordine AWS è rispettato anche fra regole header/body) |
 | Label | `awswaf:managed:aws:<group>:<Rule>` aggiunta su match (anche Count) | labels.md | `tag:` + `setvar:tx.labels` |
-| Override | per regola (Block→Count/Allow/…) o intero gruppo a Count | rule-group-override.md | `SecRuleUpdateActionById` / variabili env |
+| Override | per regola (Block→Count/Allow/…) o intero gruppo a Count | rule-group-override.md | variabili TX per sito (`rule_action_overrides`, `override_action`) renderizzate da `wafctl` |
 | IP sorgente | IP della connessione (no XFF nei managed group) | ip-rep.md | `REMOTE_ADDR`; modalità test opzionale `X-Forwarded-For` |
 
 ### Mappatura componenti AWS → variabili ModSecurity
@@ -28,7 +28,7 @@ la colonna **Impl.** indica l'approssimazione scelta. Legenda: ✅ fedele, ≈ a
 | `_COOKIE` | valori cookie | `REQUEST_COOKIES` |
 | `_QUERYSTRING` | query string grezza | `QUERY_STRING` |
 | `_QUERYARGUMENTS` | valori di tutti i parametri query | `ARGS_GET` |
-| `_URIPATH` | path senza query | `REQUEST_FILENAME` (verificare decoding vs `REQUEST_URI_RAW`) |
+| `_URIPATH` | path senza query | `TX:raw_path` = path grezzo da `REQUEST_URI_RAW` (D7) |
 | `_BODY` | body grezzo entro limite | `REQUEST_BODY` (+ `t:urlDecodeUni` dove serve) |
 | `_METHOD` | metodo | `REQUEST_METHOD` |
 
@@ -37,12 +37,26 @@ Trasformazioni AWS dei managed rule non pubbliche → si usano quelle CRS
 
 ## 2. Schema ID
 
-| Range | Rule group |
+Mappa definitiva (D23, piano 001). `siteIdx` = indice del sito nella lista ordinata dei `site_id`
+(max 100 siti per nodo); `ruleIdx` < 100.
+
+| ID / range | Uso |
 |---|---|
-| 1100000–1100099 | AWSManagedRulesAmazonIpReputationList |
-| 1200000–1200099 | AWSManagedRulesCommonRuleSet |
-| 1300000–1300099 | AWSManagedRulesKnownBadInputsRuleSet |
-| 1900000–1900099 | motore (init, label, logging) |
+| 1100000–1100099 | AWSManagedRulesAmazonIpReputationList (`iprep`) |
+| 1450000–1450099 | AWSManagedRulesAnonymousIpList (`anonip`, opzionale) |
+| 1200000–1200099 | AWSManagedRulesCommonRuleSet (`crs`) |
+| 1300000–1300099 | AWSManagedRulesKnownBadInputsRuleSet (`kbi`) |
+| 1400000–1400099 | AWSManagedRulesSQLiRuleSet (`sqli`, opzionale) |
+| per regola B | B+0..6 detector, B+7 label, B+8 terminazione, B+9 azione default AWS |
+| 1G00001 | salto del gruppo G (`SecMarker END_GRP_<key>`) |
+| 1500000 + siteIdx·1000 + ruleIdx·10 | custom rule del sito |
+| 1600000 + siteIdx·100 + groupIdx·10 (+0, +1) | scope-down per gruppo |
+| 1700000 + siteIdx·100 + i | path override (nginx-only) |
+| 1900001–1900099 | motore (init, `TX:raw_path`, …) |
+| 1910000 + siteIdx·10 + k | variabili del sito |
+| 1900800–1900930 | evaluator: 1900800/801 fail, 1900890–892 audit relevant, 1900900 SUMMARY, 1900910–913 FAIL, 1900920 BLOCK, 1900930 DEFAULT_BLOCK |
+
+Mappa id → gruppo/regola/label per ogni rev: `runtime/<rev>/rules-index.json`.
 
 ## 3. AWSManagedRulesAmazonIpReputationList (WCU 25)
 
@@ -82,6 +96,37 @@ Label prefix: `awswaf:managed:aws:core-rule-set:`. Tutte **Block**.
 | 1200200 | CrossSiteScripting_QUERYARGUMENTS | idem | ≈ idem |
 | 1200210 | CrossSiteScripting_BODY | idem | ≈ idem |
 | 1200220 | CrossSiteScripting_URIPATH | idem | ≈ idem |
+
+### Detector effettivi (generato)
+
+Tabella generata con `wafctl catalog list --group crs --format markdown` dal catalogo
+`waf/catalog/rules.yaml` (fonte di verità; la tabella sopra resta come motivazione).
+Il path `_URIPATH` è `TX:raw_path` (path grezzo da `REQUEST_URI_RAW`, D7).
+
+| ID | Group | Rule | Default | Fidelity | Detectors(vars → op) |
+|---|---|---|---|---|---|
+| 1200010 | crs | NoUserAgent_HEADER | block | exact | `&REQUEST_HEADERS:User-Agent → @eq 0` |
+| 1200020 | crs | UserAgent_BadBots_HEADER | block | approx | `REQUEST_HEADERS:User-Agent → @pmFromFile /etc/waf/data/bad-bots.data [t:lowercase]` |
+| 1200030 | crs | SizeRestrictions_QUERYSTRING | block | exact | `QUERY_STRING → @gt 2048 [t:length]` |
+| 1200040 | crs | SizeRestrictions_Cookie_HEADER | block | exact | `REQUEST_HEADERS:Cookie → @gt 10240 [t:length]` |
+| 1200050 | crs | SizeRestrictions_BODY | block | approx | `REQUEST_HEADERS:Content-Length → @gt 8192` OR `&REQUEST_HEADERS:Content-Length → @eq 0 AND REQUEST_BODY_LENGTH → @ge 8192` |
+| 1200060 | crs | SizeRestrictions_URIPATH | block | exact | `TX:raw_path → @gt 1024 [t:length]` |
+| 1200070 | crs | EC2MetaDataSSRF_BODY | block | approx | `REQUEST_BODY → @pmFromFile /etc/waf/data/ec2-metadata.data [t:urlDecodeUni,lowercase]` |
+| 1200080 | crs | EC2MetaDataSSRF_COOKIE | block | approx | `REQUEST_COOKIES → @pmFromFile /etc/waf/data/ec2-metadata.data [t:urlDecodeUni,lowercase]` |
+| 1200090 | crs | EC2MetaDataSSRF_URIPATH | block | approx | `TX:raw_path → @pmFromFile /etc/waf/data/ec2-metadata.data [t:urlDecodeUni,lowercase]` |
+| 1200100 | crs | EC2MetaDataSSRF_QUERYARGUMENTS | block | approx | `ARGS_GET → @pmFromFile /etc/waf/data/ec2-metadata.data [t:urlDecodeUni,lowercase]` |
+| 1200110 | crs | GenericLFI_QUERYARGUMENTS | block | approx | `ARGS_GET → @rx (?:^\|[\\/;])\.{2,3}[\\/;] [t:utf8toUnicode,urlDecodeUni,removeNulls]` OR `ARGS_GET → @pmFromFile /etc/waf/data/lfi-targets.data [t:utf8toUnicode,urlDecodeUni,normalizePathWin,lowercase]` |
+| 1200120 | crs | GenericLFI_URIPATH | block | approx | `TX:raw_path → @rx (?:^\|[\\/;])\.{2,3}[\\/;] [t:utf8toUnicode,urlDecodeUni,removeNulls]` OR `TX:raw_path → @pmFromFile /etc/waf/data/lfi-targets.data [t:utf8toUnicode,urlDecodeUni,normalizePathWin,lowercase]` |
+| 1200130 | crs | GenericLFI_BODY | block | approx | `REQUEST_BODY → @rx (?:^\|[\\/;=:"'\s])\.{2,3}[\\/;] [t:utf8toUnicode,urlDecodeUni,removeNulls]` OR `REQUEST_BODY → @pmFromFile /etc/waf/data/lfi-targets.data [t:utf8toUnicode,urlDecodeUni,normalizePathWin,lowercase]` |
+| 1200140 | crs | RestrictedExtensions_URIPATH | block | approx | `TX:raw_path → @rx \.(?:asa\|asax\|backup\|bak\|bat\|cdx\|cer\|cfg\|cmd\|com\|config\|conf\|crt\|cs\|csproj\|csr\|dat\|db\|dbf\|dll\|dos\|htr\|htw\|ida\|idc\|idq\|inc\|ini\|key\|licx\|lnk\|log\|mdb\|old\|pass\|pdb\|pol\|printer\|pwd\|rdb\|resources\|resx\|sql\|swp\|sys\|vb\|vbs\|vbproj\|vsdisco\|webinfo\|xsd\|xsx)$ [t:urlDecodeUni,lowercase]` |
+| 1200150 | crs | RestrictedExtensions_QUERYARGUMENTS | block | approx | `ARGS_GET → @rx \.(?:asa\|asax\|backup\|bak\|bat\|cdx\|cer\|cfg\|cmd\|com\|config\|conf\|crt\|cs\|csproj\|csr\|dat\|db\|dbf\|dll\|dos\|htr\|htw\|ida\|idc\|idq\|inc\|ini\|key\|licx\|lnk\|log\|mdb\|old\|pass\|pdb\|pol\|printer\|pwd\|rdb\|resources\|resx\|sql\|swp\|sys\|vb\|vbs\|vbproj\|vsdisco\|webinfo\|xsd\|xsx)$ [t:urlDecodeUni,lowercase]` |
+| 1200160 | crs | GenericRFI_QUERYARGUMENTS | block | approx | `ARGS_GET → @rx (?:file\|ftps?\|https?)://(?:[0-9]{1,3}\.){3}[0-9]{1,3} [t:urlDecodeUni,lowercase]` |
+| 1200170 | crs | GenericRFI_BODY | block | approx | `REQUEST_BODY → @rx (?:file\|ftps?\|https?)://(?:[0-9]{1,3}\.){3}[0-9]{1,3} [t:urlDecodeUni,lowercase]` |
+| 1200180 | crs | GenericRFI_URIPATH | block | approx | `TX:raw_path → @rx (?:file\|ftps?\|https?):/{1,2}(?:[0-9]{1,3}\.){3}[0-9]{1,3} [t:urlDecodeUni,lowercase]` |
+| 1200190 | crs | CrossSiteScripting_COOKIE | block | approx | `REQUEST_COOKIES → @detectXSS [t:utf8toUnicode,urlDecodeUni,htmlEntityDecode,jsDecode,cssDecode,removeNulls]` OR `REQUEST_COOKIES → @rx (?i)<script[^>]*> [t:utf8toUnicode,urlDecodeUni,htmlEntityDecode,jsDecode,cssDecode,removeNulls]` |
+| 1200200 | crs | CrossSiteScripting_QUERYARGUMENTS | block | approx | `ARGS_GET → @detectXSS [t:utf8toUnicode,urlDecodeUni,htmlEntityDecode,jsDecode,cssDecode,removeNulls]` OR `ARGS_GET → @rx (?i)<script[^>]*> [t:utf8toUnicode,urlDecodeUni,htmlEntityDecode,jsDecode,cssDecode,removeNulls]` |
+| 1200210 | crs | CrossSiteScripting_BODY | block | approx | `REQUEST_BODY → @detectXSS [t:utf8toUnicode,urlDecodeUni,htmlEntityDecode,jsDecode,cssDecode,removeNulls]` OR `REQUEST_BODY → @rx (?i)<script[^>]*> [t:utf8toUnicode,urlDecodeUni,htmlEntityDecode,jsDecode,cssDecode,removeNulls]` |
+| 1200220 | crs | CrossSiteScripting_URIPATH | block | approx | `TX:raw_path → @detectXSS [t:utf8toUnicode,urlDecodeUni,htmlEntityDecode,jsDecode,cssDecode,removeNulls]` OR `TX:raw_path → @rx (?i)<script[^>]*> [t:utf8toUnicode,urlDecodeUni,htmlEntityDecode,jsDecode,cssDecode,removeNulls]` |
 
 Nota: il CommonRuleSet **non** include SQLi (`AWSManagedRulesSQLiRuleSet` è un gruppo separato, non attivo di default).
 
@@ -125,5 +170,5 @@ Le regole Count non cambiano l'esito (solo label/log): gli stub non alterano il 
 
 1. Verificare priority e versione dei rule group nella web ACL one-click reale (`aws wafv2 get-web-acl`, serve MFA).
 2. Scaricare `describe-managed-rule-group` per confermare nomi regole e versione statica corrente.
-3. Formato log: emulare i campi AWS (`terminatingRuleId`, `ruleGroupList`, `labels`, `httpRequest`) da audit log JSON ModSecurity.
-4. Variabile path: `REQUEST_FILENAME` (decodificato) vs path grezzo – scegliere in base ai test.
+3. ~~Formato log~~ **Risolto (D16):** access log JSON nginx + audit log JSON ModSecurity, uniti da Vector per `request_id` in eventi con `terminating_rule`, `labels`, `action`, `aws_default_action` (+ `matches.jsonl` per regola).
+4. ~~Variabile path~~ **Risolto (D7):** i detector `_URIPATH` usano `TX:raw_path` (path grezzo); le regole a pattern aggiungono `t:urlDecodeUni`, quelle di dimensione usano la lunghezza grezza.
