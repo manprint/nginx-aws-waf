@@ -80,3 +80,7 @@
 - Failure-handling branch hit and resolved (autonomous, agent-1): after rename + `nginx -s reload`, ModSecurity kept writing the renamed audit file (libmodsecurity SharedFiles keyed by path string survive reloads). Probe: a reload with `SecAuditLog /var/log/waf//audit.log` opened a fresh file. Chosen fix: audit slot (state/audit-slot) toggled by rotate + apply; rejected `nginx -s stop` + up (downtime on every rotation of a busy node). Phase_02 rotate contract updated.
 - joinlog.sh refinement (non-weakening): the "≥ 1 matches row per blocking case" check applies to blocks by a rule; a Default_Action block has no matched rule by definition (allowlist-other).
 - G-U17: TestL0_ PASS; joinlog.sh ALL PASS (T-L1 62 events, fields, matches; T-L2 2000 events; rotate: new audit.log, old handle closed, joined event after rotation).
+
+## 1.8 attempt 1 — DONE (26-11-2026 UTC, agent-1:opus)
+- NEW scripts/bench.sh, tests/bench/rpc.json (353 B, generated with the plan's one-liner), docs/performance.md.
+- G-PERF: 3 runs, all exit 0. Median GET 6101 rps p99 2.32 ms; POST 5282 rps p99 2.75 ms (D29: ≥3500/≥3000, ≤5 ms). worker_processes 2, logs bind-mounted, Vector running.

@@ -1,0 +1,1 @@
+{"jsonrpc": "2.0", "method": "call", "params": {"model": "sale.order", "method": "web_read", "args": [[1, 2, 3]], "kwargs": {"specification": {"name": {}, "partner_id": {"fields": {"display_name": {}}}, "order_line": {"fields": {"name": {}, "price_unit": {}}}}, "context": {"lang": "it_IT", "tz": "Europe/Rome", "uid": 2, "allowed_company_ids": [1]}}}}
