@@ -1,0 +1,4 @@
+version: 1
+name: odoo-16
+description: "Odoo 16 Community: realtime /websocket (gevent port 8072), uploads /web/binary/upload_attachment."
+extends: odoo-common

@@ -1,0 +1,4 @@
+version: 1
+name: odoo-12
+description: "Odoo 12 Community: realtime /longpolling (port 8072), uploads /web/binary/upload_attachment."
+extends: odoo-common

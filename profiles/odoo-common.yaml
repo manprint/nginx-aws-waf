@@ -1,0 +1,26 @@
+version: 1
+name: odoo-common
+description: "Odoo Community: RPC bodies and editor HTML counted, then blocked outside Odoo RPC/editor paths (aws-compatible)"
+extends: aws-default
+rule_groups:
+  - name: AWSManagedRulesCommonRuleSet
+    rule_action_overrides:
+      SizeRestrictions_BODY: count
+      CrossSiteScripting_BODY: count
+      GenericRFI_BODY: count
+custom_rules:
+  - name: OdooBodySizeOutsideRpc
+    slot: after:AWSManagedRulesCommonRuleSet
+    action: block
+    match: {all: [{label: "awswaf:managed:aws:core-rule-set:SizeRestrictions_Body"},
+                  {uri_path: {regex: "^/(web/dataset/|web/binary/|mail/|html_editor/|web_editor/|website/|web/action/|longpolling/|websocket|bus/|web/webclient/)"}, negate: true}]}
+  - name: OdooXssBodyOutsideEditor
+    slot: after:AWSManagedRulesCommonRuleSet
+    action: block
+    match: {all: [{label: "awswaf:managed:aws:core-rule-set:CrossSiteScripting_Body"},
+                  {uri_path: {regex: "^/(web/dataset/|mail/|html_editor/|web_editor/|website/)"}, negate: true}]}
+  - name: OdooRfiBodyOutsideRpc
+    slot: after:AWSManagedRulesCommonRuleSet
+    action: block
+    match: {all: [{label: "awswaf:managed:aws:core-rule-set:GenericRFI_Body"},
+                  {uri_path: {regex: "^/(web/dataset/|mail/|html_editor/|web_editor/|website/)"}, negate: true}]}

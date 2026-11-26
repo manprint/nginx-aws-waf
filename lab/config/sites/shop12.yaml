@@ -1,0 +1,11 @@
+version: 1
+site_id: shop12
+server_names: [shop12.lab.test]
+app: odoo
+profile: odoo-12
+upstream:
+  servers: ["odoo12:8069"]
+  realtime: {path: /longpolling, servers: ["odoo12:8072"]}
+  max_body_size: 100m
+  read_timeout_sec: 720
+client_ip: {source: xff, trusted_proxies: ["0.0.0.0/0", "::/0"]}

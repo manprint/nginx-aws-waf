@@ -32,6 +32,22 @@ lab-min-up: wafctl lists ## start the minimal lab (WAF node + echo)
 lab-min-down: ## stop the minimal lab
 	$(COMPOSE_NODE) down
 
+COMPOSE_LAB := $(COMPOSE_NODE) -f deploy/compose/lab.yml
+
+.PHONY: lab-up lab-down lab-reset
+lab-up: export WAF_COMPOSE_EXTRA = deploy/compose/lab-min.yml:deploy/compose/lab.yml
+lab-up: lab-min-up ## start the full lab (WAF node + Odoo 12/14/16/18)
+	$(COMPOSE_LAB) up -d pg12 pg13 pg15 pg16
+	./scripts/lab-init-odoo.sh
+	./wafctl/bin/wafctl apply
+
+lab-down: ## stop the full lab (volumes kept)
+	$(COMPOSE_LAB) down
+
+lab-reset: ## stop the full lab and delete its volumes (Odoo databases)
+	@if [ "$(FORCE)" != 1 ]; then read -p "Delete all lab volumes (Odoo databases)? [y/N] " a; [ "$$a" = y ]; fi
+	$(COMPOSE_LAB) down -v
+
 .PHONY: test-e2e
 test-e2e: lab-min-up ## run the request corpus against the lab node (G-U16)
 	./wafctl/bin/wafctl test run --suite tests/corpus

@@ -1,0 +1,75 @@
+# Odoo lab (project waf): 4 Odoo Community versions behind the WAF node.
+# Use with node.yml + node.bridge.yml + lab-min.yml. Ports are not published: traffic goes through the WAF only.
+services:
+  pg12:
+    image: postgres:12
+    environment: {POSTGRES_USER: odoo, POSTGRES_PASSWORD: odoo, POSTGRES_DB: postgres}
+    restart: unless-stopped
+    volumes: ["pg12:/var/lib/postgresql/data"]
+    networks: [lab]
+  pg13:
+    image: postgres:13
+    environment: {POSTGRES_USER: odoo, POSTGRES_PASSWORD: odoo, POSTGRES_DB: postgres}
+    restart: unless-stopped
+    volumes: ["pg13:/var/lib/postgresql/data"]
+    networks: [lab]
+  pg15:
+    image: postgres:15
+    environment: {POSTGRES_USER: odoo, POSTGRES_PASSWORD: odoo, POSTGRES_DB: postgres}
+    restart: unless-stopped
+    volumes: ["pg15:/var/lib/postgresql/data"]
+    networks: [lab]
+  pg16:
+    image: postgres:16
+    environment: {POSTGRES_USER: odoo, POSTGRES_PASSWORD: odoo, POSTGRES_DB: postgres}
+    restart: unless-stopped
+    volumes: ["pg16:/var/lib/postgresql/data"]
+    networks: [lab]
+  odoo12:
+    image: odoo:12
+    command: ["odoo", "--db_host=pg12", "--db_user=odoo", "--db_password=odoo", "--proxy-mode", "--db-filter=^lab$$", "--workers=2", "--longpolling-port=8072", "--max-cron-threads=1", "--limit-time-real=600"]
+    environment: {HOST: pg12, USER: odoo, PASSWORD: odoo}   # the image entrypoint appends --db_host $$HOST etc.
+    depends_on: [pg12]
+    restart: unless-stopped
+    mem_limit: 1500m
+    volumes: ["odoo12:/var/lib/odoo"]
+    networks: [lab]
+  odoo14:
+    image: odoo:14
+    command: ["odoo", "--db_host=pg13", "--db_user=odoo", "--db_password=odoo", "--proxy-mode", "--db-filter=^lab$$", "--workers=2", "--longpolling-port=8072", "--max-cron-threads=1", "--limit-time-real=600"]
+    environment: {HOST: pg13, USER: odoo, PASSWORD: odoo}   # the image entrypoint appends --db_host $$HOST etc.
+    depends_on: [pg13]
+    restart: unless-stopped
+    mem_limit: 1500m
+    volumes: ["odoo14:/var/lib/odoo"]
+    networks: [lab]
+  odoo16:
+    image: odoo:16
+    command: ["odoo", "--db_host=pg15", "--db_user=odoo", "--db_password=odoo", "--proxy-mode", "--db-filter=^lab$$", "--workers=2", "--gevent-port=8072", "--max-cron-threads=1", "--limit-time-real=600"]
+    environment: {HOST: pg15, USER: odoo, PASSWORD: odoo}   # the image entrypoint appends --db_host $$HOST etc.
+    depends_on: [pg15]
+    restart: unless-stopped
+    mem_limit: 1500m
+    volumes: ["odoo16:/var/lib/odoo"]
+    networks: [lab]
+  odoo18:
+    image: odoo:18
+    command: ["odoo", "--db_host=pg16", "--db_user=odoo", "--db_password=odoo", "--proxy-mode", "--db-filter=^lab$$", "--workers=2", "--gevent-port=8072", "--max-cron-threads=1", "--limit-time-real=600"]
+    environment: {HOST: pg16, USER: odoo, PASSWORD: odoo}   # the image entrypoint appends --db_host $$HOST etc.
+    depends_on: [pg16]
+    restart: unless-stopped
+    mem_limit: 1500m
+    volumes: ["odoo18:/var/lib/odoo"]
+    networks: [lab]
+volumes:
+  pg12: {}
+  pg13: {}
+  pg15: {}
+  pg16: {}
+  odoo12: {}
+  odoo14: {}
+  odoo16: {}
+  odoo18: {}
+networks:
+  lab:
+    name: waf_lab

@@ -1,0 +1,4 @@
+version: 1
+name: odoo-18
+description: "Odoo 18 Community: realtime /websocket (gevent port 8072), uploads /mail/attachment/upload and /html_editor/attachment/add_data."
+extends: odoo-common
