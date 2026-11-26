@@ -47,3 +47,12 @@ I siti di lab sono in `lab/config/sites/` (demo, strict, tuned, shadow, allowlis
 `demo` ha anche i nomi `localhost` e `127.0.0.1` per i casi Host_localhost_HEADER.
 Il nome IPv6 `[::1]` non è un server_name valido, quindi la variante IPv6 di quel caso
 non è coperta dal corpus (lo copre la regola, verificata nel prototipo).
+
+## Corpus sui siti Odoo (`make test-odoo`)
+
+`wafctl test run --suite tests/corpus --filter-site demo --retarget demo=shopNN --exceptions tests/odoo-exceptions.yaml`
+rilancia i casi del sito `demo` contro ogni sito Odoo. I siti speciali (`tuned`, `allowlist`,
+`strict`, `shadow`) non vengono mai spostati. `tests/odoo-exceptions.yaml` sostituisce
+l'attesa di un caso su alcuni siti; ogni eccezione deve avere un `reason` (altrimenti errore
+di caricamento). I casi con `request.host` esplicito (localhost, 127.0.0.1) arrivano comunque
+al sito `demo`, che ha quegli alias.

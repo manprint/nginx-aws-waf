@@ -1,0 +1,45 @@
+# Per-site expectation overrides for `make test-odoo` (demo corpus retargeted to shop12..18).
+# Every entry needs a reason; see tests/README.md. Reviewed in plan 001 unit 2.2.
+version: 1
+exceptions:
+  # odoo-common counts these rules and re-blocks them with a label rule outside Odoo RPC/editor
+  # paths: still 403, but the terminating rule is the label rule (path "/" is not an RPC path).
+  - case: crs-size-body
+    sites: [shop12, shop14, shop16, shop18]
+    expect: {status: 403, terminating_rule: OdooBodySizeOutsideRpc, matches: [SizeRestrictions_BODY]}
+    reason: "odoo-common: SizeRestrictions_BODY counted, label rule blocks outside RPC paths"
+  - case: crs-size-body-chunked
+    sites: [shop12, shop14, shop16, shop18]
+    expect: {status: 403, terminating_rule: OdooBodySizeOutsideRpc, matches: [SizeRestrictions_BODY]}
+    reason: "odoo-common: SizeRestrictions_BODY counted, label rule blocks outside RPC paths (chunked body)"
+  - case: crs-rfi-body
+    sites: [shop12, shop14, shop16, shop18]
+    expect: {status: 403, terminating_rule: OdooRfiBodyOutsideRpc, matches: [GenericRFI_BODY]}
+    reason: "odoo-common: GenericRFI_BODY counted, label rule blocks outside RPC/editor paths"
+  - case: crs-xss-body
+    sites: [shop12, shop14, shop16, shop18]
+    expect: {status: 403, terminating_rule: OdooXssBodyOutsideEditor, matches: [CrossSiteScripting_BODY]}
+    reason: "odoo-common: CrossSiteScripting_BODY counted, label rule blocks outside RPC/editor paths"
+  - case: crs-xss-multipart
+    sites: [shop12, shop14, shop16, shop18]
+    expect: {status: 403, terminating_rule: OdooXssBodyOutsideEditor, matches: [CrossSiteScripting_BODY]}
+    reason: "odoo-common: CrossSiteScripting_BODY counted, label rule blocks outside RPC/editor paths (multipart)"
+  # Allowed by the WAF (Default_Action); the status is Odoo's own answer, not a WAF decision.
+  - case: clean-get
+    sites: [shop12, shop14, shop16, shop18]
+    expect: {status: 303, terminating_rule: Default_Action}
+    reason: "Odoo redirects /web without a session to /web/login (303)"
+  - case: clean-post-form
+    sites: [shop12, shop14, shop16, shop18]
+    expect: {status: 400, terminating_rule: Default_Action}
+    reason: "Odoo rejects a login POST without csrf_token (400)"
+  # Intended Odoo exception: RPC bodies > 8 KB on /web/dataset/ are counted, and (as on AWS with
+  # the 8 KB inspection limit) the XSS placed after the first 8 KB is not inspected.
+  - case: body-limit-8k
+    sites: [shop12, shop14]
+    expect: {status: 302, terminating_rule: Default_Action, matches: [SizeRestrictions_BODY]}
+    reason: "odoo-common counts SizeRestrictions_BODY on /web/dataset/; payload beyond 8 KB not inspected (AWS-equivalent); Odoo 12/14 answer 302"
+  - case: body-limit-8k
+    sites: [shop16, shop18]
+    expect: {status: 400, terminating_rule: Default_Action, matches: [SizeRestrictions_BODY]}
+    reason: "odoo-common counts SizeRestrictions_BODY on /web/dataset/; payload beyond 8 KB not inspected (AWS-equivalent); Odoo 16/18 answer 400"

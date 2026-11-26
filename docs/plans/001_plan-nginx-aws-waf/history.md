@@ -101,3 +101,9 @@
 - Deviation (non-weakening): the odoo image entrypoint appends `--db_host $HOST …` after the command, overriding the plan's flags → services also get env HOST=pgNN/USER/PASSWORD.
 - Init durations (S2, §6): odoo12 40 s, odoo14 30 s, odoo16 27 s, odoo18 42 s; `make lab-up` total 3 min 05 s. No OOM (Odoo RSS 330–450 MiB of 1.5 GiB); --workers=2 kept.
 - G-U21: TestPRF1_ PASS; lab-smoke.sh ALL PASS (16 checks; realtime 200 on /longpolling/poll, 400 on GET /websocket without upgrade); corpus still PASSED 62/62.
+
+## 2.2 attempt 1 — DONE (26-11-2026 UTC, agent-1:opus)
+- NEW internal/testrun/{retarget,retarget_test}.go; `test run` flags --filter-site, --retarget, --exceptions; Makefile `test-odoo`; tests/odoo-exceptions.yaml; tests/README section.
+- Exceptions (self-review, all justified, none weakens a block): (a) crs-size-body, -chunked, crs-rfi-body, crs-xss-body, crs-xss-multipart → still 403, terminating rule is the odoo-common label rule (path "/" is outside RPC paths) with the managed rule in `matches`; (b) clean-get 303 / clean-post-form 400 = Odoo's own answers after WAF Default_Action; (c) body-limit-8k on /web/dataset/call_kw → allowed: SizeRestrictions_BODY counted by design (D27) and the XSS after 8 KB is not inspected — same as AWS with an 8 KB limit; Odoo answers 302 (12/14) or 400 (16/18). The plan expected an empty list; it did not foresee that a re-block changes the terminating rule name, nor backend status codes.
+- Note: Host-override cases (kbi-host-localhost, kbi-host-loopback-v4, first-wins) reach site demo (localhost aliases), not shopNN.
+- G-U22: TestT4_, TestT5_ PASS; `make test-odoo` PASSED 48/48 on shop12, shop14, shop16, shop18.

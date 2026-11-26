@@ -48,6 +48,10 @@ lab-reset: ## stop the full lab and delete its volumes (Odoo databases)
 	@if [ "$(FORCE)" != 1 ]; then read -p "Delete all lab volumes (Odoo databases)? [y/N] " a; [ "$$a" = y ]; fi
 	$(COMPOSE_LAB) down -v
 
+.PHONY: test-odoo
+test-odoo: ## run the demo corpus against the four Odoo sites (G-U22)
+	@rc=0; for v in 12 14 16 18; do echo "== shop$$v"; ./wafctl/bin/wafctl test run --suite tests/corpus --filter-site demo --retarget demo=shop$$v --exceptions tests/odoo-exceptions.yaml || rc=1; done; exit $$rc
+
 .PHONY: test-e2e
 test-e2e: lab-min-up ## run the request corpus against the lab node (G-U16)
 	./wafctl/bin/wafctl test run --suite tests/corpus

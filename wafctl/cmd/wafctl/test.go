@@ -52,6 +52,9 @@ func cmdTest(args []string) int {
 		r, dir, format := newRunner(fs)
 		suite := fs.String("suite", "tests/corpus", "corpus dir or file")
 		filter := fs.String("filter", "", "only case ids containing S")
+		filterSite := fs.String("filter-site", "", "only cases of this site (before retargeting)")
+		retarget := fs.String("retarget", "", "FROM=TO[,FROM=TO]: run cases of site FROM against site TO")
+		exFile := fs.String("exceptions", "", "exceptions file (per-site expectation overrides)")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
@@ -60,6 +63,19 @@ func cmdTest(args []string) int {
 			fmt.Fprintln(os.Stderr, "wafctl:", err)
 			return 2
 		}
+		rt, err := testrun.ParseRetarget(*retarget)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "wafctl:", err)
+			return 2
+		}
+		var ex []testrun.Exception
+		if *exFile != "" {
+			if ex, err = testrun.LoadExceptions(*exFile); err != nil {
+				fmt.Fprintln(os.Stderr, "wafctl:", err)
+				return 2
+			}
+		}
+		cases = testrun.Retarget(testrun.FilterSite(cases, *filterSite), rt, ex)
 		if *filter != "" {
 			var f []testrun.Case
 			for _, c := range cases {
