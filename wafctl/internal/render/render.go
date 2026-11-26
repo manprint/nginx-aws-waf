@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -81,6 +82,10 @@ func Render(cfg *config.Config, cat *catalog.Catalog, bypass map[string]bool, op
 	files["modsec/main.conf"] = []byte(main)
 	if err := r.extraFiles(files); err != nil {
 		return nil, err
+	}
+	// Test hook (tests/e2e/apply.sh): WAF_TEST_INJECT=1 makes nginx.conf invalid.
+	if os.Getenv("WAF_TEST_INJECT") == "1" {
+		files["nginx/nginx.conf"] = append(files["nginx/nginx.conf"], []byte("bogus_directive on;\n")...)
 	}
 	rev := opt.Now.UTC().Format("20060102T150405Z") + "-" + hashFiles(files)
 	out := &Output{Rev: rev, Files: map[string][]byte{}}

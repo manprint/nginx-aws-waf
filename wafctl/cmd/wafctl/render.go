@@ -1,50 +1,38 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
-	"nginxawswaf/wafctl/internal/config"
+	"nginxawswaf/wafctl/internal/apply"
 	"nginxawswaf/wafctl/internal/env"
 	"nginxawswaf/wafctl/internal/render"
-	"nginxawswaf/wafctl/internal/version"
 )
 
-// renderConfig loads, validates and renders; validation errors are printed and returned as exit 2.
-func renderConfig(dir string, bypass map[string]bool) (*render.Output, int) {
-	cat, err := loadCatalog()
+// prepare runs apply.Prepare and prints issues/warnings; rc != 0 on failure (2 = validation).
+func prepare(dir string) (*apply.Prepared, int) {
+	p, err := apply.Prepare(dir, time.Now())
+	if p != nil {
+		for _, i := range p.Issues {
+			fmt.Fprintln(os.Stderr, i.String())
+		}
+		for _, w := range p.Warnings {
+			fmt.Fprintln(os.Stderr, "warning:", w)
+		}
+	}
+	if errors.Is(err, apply.ErrInvalid) {
+		fmt.Fprintln(os.Stderr, "wafctl:", err)
+		return nil, 2
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "wafctl:", err)
 		return nil, 2
 	}
-	cfg, err := config.Load(dir)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "wafctl:", err)
-		return nil, 2
-	}
-	issues := config.Validate(cfg, cat)
-	for _, i := range issues {
-		fmt.Fprintln(os.Stderr, i.String())
-	}
-	if config.HasErrors(issues) {
-		return nil, 2
-	}
-	created, err := render.EnsureLists(cat, filepath.Join(env.DataDir(), "lists"))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "wafctl:", err)
-		return nil, 1
-	}
-	for _, n := range created {
-		fmt.Fprintf(os.Stderr, "warning: list %s missing; created placeholder in %s\n", n, filepath.Join(env.DataDir(), "lists"))
-	}
-	out, err := render.Render(cfg, cat, bypass, render.Options{Version: version.Version})
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "wafctl:", err)
-		return nil, 1
-	}
-	return out, 0
+	return p, 0
 }
 
 func cmdRender(args []string) int {
@@ -54,15 +42,15 @@ func cmdRender(args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	out, rc := renderConfig(*dir, nil)
+	p, rc := prepare(*dir)
 	if rc != 0 {
 		return rc
 	}
 	d := *outDir
 	if d == "" {
-		d = filepath.Join(env.DataDir(), "runtime", out.Rev)
+		d = filepath.Join(env.DataDir(), "runtime", p.Out.Rev)
 	}
-	if err := render.WriteTree(out, d); err != nil {
+	if err := render.WriteTree(p.Out, d); err != nil {
 		return fail("%v", err)
 	}
 	fmt.Println(d)

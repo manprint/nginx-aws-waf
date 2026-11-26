@@ -228,7 +228,8 @@ http {
   modsecurity_transaction_id "$request_id";
   server { listen 127.0.0.1:8090; access_log off; modsecurity off;
     location = /nginx_status { stub_status; }
-    location = /healthz { return 200 "ok\n"; } }
+    location = /healthz { return 200 "ok\n"; }
+    location = /__rev { return 200 "<R>\n"; } }      # apply polls it after reload (reload is asynchronous)
   <default server: when default_site == "": listen <http> default_server (+ [::] when ipv6);
     set $waf_site __default__; set $waf_app generic; modsecurity off; return 444;
     plus, if any site has tls != off: listen <https> ssl default_server (+[::]); ssl_reject_handshake on;>
@@ -439,7 +440,7 @@ Render first produces content with the placeholder `/etc/waf/runtime/REV`, hashe
       2. render to `runtime/<rev>.tmp`, then rename to `runtime/<rev>` (if `<rev>` exists, reuse it);
       3. `nginx -t -q -c /etc/waf/runtime/<rev>/nginx/nginx.conf` (Exec if running, else RunOnce) — on failure print the output, `rm -rf` the rev, exit 1;
       4. `ln -s <rev> runtime/current.new` + `os.Rename(current.new, current)`;
-      5. if running, Exec `nginx -s reload -c /etc/waf/runtime/current/nginx/nginx.conf`, else `Up()` and poll the health of `waf` (`docker inspect -f '{{.State.Health.Status}}'`) until healthy (60 s timeout → exit 1);
+      5. if running, Exec `nginx -s reload -c /etc/waf/runtime/current/nginx/nginx.conf`, then poll `Exec wget -qO- http://127.0.0.1:8090/__rev` until it contains the new rev (100 ms interval, 15 s timeout → exit 1; the signal-based reload is asynchronous), else `Up()` and poll the health of `waf` (`docker inspect -f '{{.State.Health.Status}}'`) until healthy (60 s timeout → exit 1);
       6. prune rev dirs to the newest 5 plus the current target;
       7. print `applied <rev>`.
       Flag `--dry-run` stops after step 3.

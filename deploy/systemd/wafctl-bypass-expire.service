@@ -1,0 +1,8 @@
+[Unit]
+Description=Expire temporary WAF bypasses (wafctl bypass expire)
+After=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/wafctl
+ExecStart=/usr/local/bin/wafctl bypass expire

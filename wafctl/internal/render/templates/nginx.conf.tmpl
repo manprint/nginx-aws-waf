@@ -32,7 +32,8 @@ http {
   modsecurity_transaction_id "$request_id";
   server { listen 127.0.0.1:8090; access_log off; modsecurity off;
     location = /nginx_status { stub_status; }
-    location = /healthz { return 200 "ok\n"; } }
+    location = /healthz { return 200 "ok\n"; }
+    location = /__rev { return 200 "{{.R}}\n"; } }
 {{- if .DefaultServer}}
   server {
 {{- range .DefaultListens}}
