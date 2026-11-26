@@ -126,3 +126,9 @@
 - Evidence (legit-only matches): SizeRestrictions_BODY COUNT on /web/dataset/call_kw (18/18/18/15 per site), CrossSiteScripting_BODY COUNT on call_kw (6/6/6/5). GenericRFI_BODY never matched by legit flows: kept in odoo-common as preventive (documented in docs/odoo.md), no exception added. Version profiles stay empty extends.
 - NEW docs/odoo.md, docs/lab-matrix-001.md (matrix 26-11-2026); README "Lab Odoo" section + doc links.
 - G-U25 PASS.
+
+## P2 attempt 1 — DONE (26-11-2026 UTC, agent-1:opus)
+- G-P2 on the running lab: `make lab-up test-e2e test-odoo lab-legit lab-matrix` rc 0 (odoo12–18 ready; PASSED 62/62; test-odoo 48/48 ×4; legit RUN_ID d5b1637d 12/12; matrix written) and `scripts/lab-matrix.sh --sql legit.sql` → 0. lab-smoke.sh ALL PASS. `go vet` clean, 7 packages ok. G-U21..G-U25 PASS.
+- Review (agent-1, self-review): D27 — odoo profiles use only rule_action_overrides→count + label custom rules (TestPRF1_ PASS, `wafctl validate` reports shop sites nginx-only only because of client_ip xff, which is lab topology, not profile). Exceptions: every reason checked; none turns a block into an allow on a non-Odoo path (5 are re-blocks with a different terminating rule, 2 are backend status codes, body-limit-8k is AWS-equivalent 8 KB inspection). Matrix: legit 0 BLOCK; nikto 100 % blocked (UserAgent_BadBots_HEADER); nuclei 0 findings, 20–25 % of its requests blocked (the rest are benign probes).
+- README obligation met (Lab Odoo section, docs/odoo.md, docs/lab-matrix-001.md).
+- Open finding carried forward: nginx-native errors (TRACE 405, malformed 400) show `Server: nginx` (2.4).
