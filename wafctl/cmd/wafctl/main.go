@@ -12,6 +12,7 @@ var commands = map[string]func([]string) int{
 	"version":  cmdVersion,
 	"catalog":  cmdCatalog,
 	"validate": cmdValidate,
+	"render":   cmdRender,
 }
 
 func usage() {

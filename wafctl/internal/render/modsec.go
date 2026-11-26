@@ -150,7 +150,7 @@ func (r *renderer) groupRules(l *lines, g *catalog.Group) {
 	}
 }
 
-// extraFiles adds the site files and rules-index.json (nginx/static files in 1.3).
+// extraFiles adds site files, rules-index.json, nginx files, static pages and data files.
 func (r *renderer) extraFiles(files map[string][]byte) error {
 	for _, s := range r.sites {
 		t, err := r.siteFile(s)
@@ -164,7 +164,10 @@ func (r *renderer) extraFiles(files map[string][]byte) error {
 		return err
 	}
 	files["rules-index.json"] = idx
-	return nil
+	if err := r.nginxFiles(files); err != nil {
+		return err
+	}
+	return r.staticAndData(files)
 }
 
 // audit.scope=relevant: SUMMARY (and so the audit record) only for requests with a hit, a failure or a default block.

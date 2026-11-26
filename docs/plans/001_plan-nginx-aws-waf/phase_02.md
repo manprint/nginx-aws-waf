@@ -213,8 +213,8 @@ http {
   server_tokens off;
   sendfile on;
   keepalive_timeout 65;
-  client_body_temp_path /tmp/nginx/body; proxy_temp_path /tmp/nginx/proxy;
-  fastcgi_temp_path /tmp/nginx/fcgi; uwsgi_temp_path /tmp/nginx/uwsgi; scgi_temp_path /tmp/nginx/scgi;
+  client_body_temp_path /tmp/ngx_body; proxy_temp_path /tmp/ngx_proxy;
+  fastcgi_temp_path /tmp/ngx_fcgi; uwsgi_temp_path /tmp/ngx_uwsgi; scgi_temp_path /tmp/ngx_scgi;
   large_client_header_buffers 4 16k;
   client_body_buffer_size 128k;
   resolver 127.0.0.11 ipv6=off valid=10s;          # only when node.network=bridge

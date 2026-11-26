@@ -11,6 +11,7 @@ import (
 
 	"nginxawswaf/wafctl/internal/catalog"
 	"nginxawswaf/wafctl/internal/config"
+	"nginxawswaf/wafctl/internal/env"
 )
 
 // RevPlaceholder is the rev token used while hashing.
@@ -21,6 +22,7 @@ type Options struct {
 	Now         time.Time
 	Version     string
 	RuntimeRoot string // "/etc/waf/runtime"
+	Home        string // WAF_HOME (data and static files); default env.Home()
 }
 
 // Output is a rendered runtime tree (paths relative to the runtime dir).
@@ -47,6 +49,13 @@ type renderer struct {
 func Render(cfg *config.Config, cat *catalog.Catalog, bypass map[string]bool, opt Options) (*Output, error) {
 	if opt.RuntimeRoot == "" {
 		opt.RuntimeRoot = "/etc/waf/runtime"
+	}
+	if opt.Home == "" {
+		h, err := env.Home()
+		if err != nil {
+			return nil, err
+		}
+		opt.Home = h
 	}
 	if opt.Now.IsZero() {
 		opt.Now = time.Now()
@@ -80,6 +89,7 @@ func Render(cfg *config.Config, cat *catalog.Catalog, bypass map[string]bool, op
 		s = strings.Replace(s, " rev "+RevPlaceholder+" ", " rev "+rev+" ", 1)
 		out.Files[p] = []byte(s)
 	}
+	out.Files["meta.json"] = r.meta(rev)
 	return out, nil
 }
 

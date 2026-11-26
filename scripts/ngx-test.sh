@@ -14,7 +14,8 @@ docker image inspect "$img" >/dev/null 2>&1 || img="owasp/modsecurity-crs:4.30.0
 lists="${WAF_DATA_DIR:-$here/.run}/lists"
 [[ -d "$lists" ]] || { echo "missing $lists (run: make lists)" >&2; exit 2; }
 R="/etc/waf/runtime/$rev"
-args=(--rm -v "$lists:/etc/waf/lists:ro")
+certs="${WAF_DATA_DIR:-$here/.run}/certs"
+args=(--rm --user root -v "$lists:/etc/waf/lists:ro")
 if (( modsec_only )); then
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
   mkdir -p "$tmp/$rev/modsec" "$tmp/$rev/nginx" "$tmp/$rev/data"
@@ -39,6 +40,9 @@ $site_inc}
 NGX
   dir="$tmp/$rev"
 else
+  logs="$(mktemp -d)"; trap 'rm -rf "$logs"' EXIT
+  args+=(-v "$logs:/var/log/waf")
+  [[ -d "$certs" ]] && args+=(-v "$certs:/etc/waf/certs:ro")
   docker network inspect waf_lab >/dev/null 2>&1 && args+=(--network waf_lab)
   for h in $(grep -ho 'server [A-Za-z0-9._-]*:[0-9]*' "$dir"/nginx/sites/*.conf 2>/dev/null | awk '{print $2}' | cut -d: -f1 | sort -u); do
     [[ "$h" =~ ^[0-9.]+$ ]] || docker network inspect waf_lab >/dev/null 2>&1 || args+=(--add-host "$h:127.0.0.1")
