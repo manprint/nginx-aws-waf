@@ -55,6 +55,9 @@ func Load(dir string) (*Config, error) {
 			return nil, err
 		}
 		s.File = p
+		if s.TLS.Mode == "" {
+			s.TLS.Mode = "off"
+		}
 		if want := strings.TrimSuffix(filepath.Base(p), ".yaml"); s.SiteID != want {
 			return nil, fmt.Errorf("%s: site_id %q must equal the file name %q", p, s.SiteID, want)
 		}

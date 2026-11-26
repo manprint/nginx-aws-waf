@@ -9,8 +9,9 @@ import (
 )
 
 var commands = map[string]func([]string) int{
-	"version": cmdVersion,
-	"catalog": cmdCatalog,
+	"version":  cmdVersion,
+	"catalog":  cmdCatalog,
+	"validate": cmdValidate,
 }
 
 func usage() {

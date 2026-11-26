@@ -1,0 +1,9 @@
+version: 1
+node_id: lab-node-1
+role: all-in-one
+network: bridge
+listen: {http: 8080, https: 8443, ipv6: true}
+workers: 2
+geoip: {enabled: false}
+audit: {scope: all}
+lab: {enabled: true}
