@@ -82,6 +82,22 @@ services:
     depends_on:
       clickhouse: {condition: service_healthy}
     networks: [central]
+  apprise:
+    image: caronc/apprise:2.2.0
+    restart: unless-stopped
+    environment:
+      APPRISE_STATEFUL_MODE: simple
+    volumes:
+      - ${WAF_CENTRAL_DIR}/apprise:/config
+    networks: [central]
+  alert-sink:   # lab/test only: apprise json:// target that logs each notification
+    image: python:3.13-alpine
+    profiles: [test]
+    restart: unless-stopped
+    command: ["python", "-u", "/alert_sink.py"]
+    volumes:
+      - ./lab/alert_sink.py:/alert_sink.py:ro
+    networks: [central]
 networks:
   central:
     name: waf_central

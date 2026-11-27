@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -74,12 +76,21 @@ func TestCEN2_PrometheusGolden(t *testing.T) {
 	golden(t, "prometheus.yml", files["prometheus/prometheus.yml"])
 	out := t.TempDir()
 	ch, err := Render(Defaults(), t.TempDir(), out)
-	if err != nil || strings.Join(ch, ",") != "grafana,prometheus" {
+	if err != nil || strings.Join(ch, ",") != "apprise,grafana,prometheus" {
 		t.Fatalf("first render changed %v %v", ch, err)
 	}
+	// service state next to rendered files (apprise pid/store, prometheus data) is not a change
+	os.WriteFile(filepath.Join(out, "apprise", ".scheduler.pid"), []byte("1"), 0o600)
+	os.MkdirAll(filepath.Join(out, "prometheus", "data"), 0o755)
+	os.WriteFile(filepath.Join(out, "prometheus", "data", "x"), []byte("1"), 0o600)
 	ch, _ = Render(Defaults(), t.TempDir(), out)
 	if len(ch) != 0 {
 		t.Errorf("second render changed %v", ch)
+	}
+	c := Defaults()
+	c.Alerts.BlockSpikePer5m = 7
+	if ch, _ = Render(c, t.TempDir(), out); strings.Join(ch, ",") != "grafana" {
+		t.Errorf("threshold change restarted %v, want grafana", ch)
 	}
 }
 
@@ -109,5 +120,55 @@ func TestG1_UserAddRequestGolden(t *testing.T) {
 	}
 	if p, _ := RandomPassword(20); len(p) != 20 {
 		t.Errorf("password length %d", len(p))
+	}
+}
+
+func TestAL1_RulesGoldenDefaults(t *testing.T) {
+	golden(t, "alert-rules.yaml", RulesYAML(Defaults().Alerts))
+	var doc struct {
+		Groups []struct {
+			Rules []struct {
+				UID  string `yaml:"uid"`
+				Data []struct {
+					Model map[string]any `yaml:"model"`
+				} `yaml:"data"`
+			} `yaml:"rules"`
+		} `yaml:"groups"`
+	}
+	if err := yaml.Unmarshal(RulesYAML(Defaults().Alerts), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Groups) != 1 || len(doc.Groups[0].Rules) != 5 {
+		t.Fatalf("rules %+v", doc)
+	}
+	r := doc.Groups[0].Rules[1] // waf-fail: fail_per_5m 1 → gt 0
+	c := r.Data[2].Model["conditions"].([]any)[0].(map[string]any)["evaluator"].(map[string]any)["params"].([]any)[0]
+	if r.UID != "waf-fail" || c != 0 {
+		t.Errorf("waf-fail threshold %v", c)
+	}
+	if !strings.Contains(r.Data[0].Model["rawSql"].(string), "action = 'FAIL'") {
+		t.Errorf("sql %v", r.Data[0].Model["rawSql"])
+	}
+}
+
+func TestAL2_AppriseSkipsComments(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "apprise-urls.txt"), []byte("# slack\n\n  json://alert-sink:8000/  \n# tgram://x/y\ngchat://a/b/c\n"), 0o600)
+	files, err := Files(Defaults(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(files["apprise/waf.yml"])
+	want := "# Rendered by wafctl central render from the apprise URLs file — do not edit.\nurls:\n  - \"json://alert-sink:8000/\":\n      - tag: waf\n  - \"gchat://a/b/c\":\n      - tag: waf\n"
+	if got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+	var doc map[string]any
+	if err := yaml.Unmarshal([]byte(got), &doc); err != nil {
+		t.Fatal(err)
+	}
+	empty, _ := Files(Defaults(), t.TempDir())
+	if string(empty["apprise/waf.yml"]) != "# Rendered by wafctl central render from the apprise URLs file — do not edit.\nurls: []\n" {
+		t.Errorf("empty: %s", empty["apprise/waf.yml"])
 	}
 }

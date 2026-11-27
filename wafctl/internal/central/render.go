@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -16,7 +15,7 @@ import (
 var tmplFS embed.FS
 
 // Components are the rendered sub-directories of $WAF_CENTRAL_DIR, each owned by one service.
-var Components = map[string]string{"prometheus": "prometheus", "grafana": "grafana"}
+var Components = map[string]string{"prometheus": "prometheus", "grafana": "grafana", "apprise": "apprise"}
 
 // Files returns the rendered files (path relative to $WAF_CENTRAL_DIR → content).
 func Files(c Config, configDir string) (map[string][]byte, error) {
@@ -26,6 +25,13 @@ func Files(c Config, configDir string) (map[string][]byte, error) {
 	}
 	files := map[string][]byte{"prometheus/prometheus.yml": prom}
 	for k, v := range grafanaFiles() {
+		files[k] = v
+	}
+	af, err := alertFiles(c, configDir)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range af {
 		files[k] = v
 	}
 	return files, nil
@@ -39,7 +45,7 @@ func Render(c Config, configDir, outDir string) ([]string, error) {
 	}
 	before := map[string]string{}
 	for comp := range Components {
-		before[comp] = dirHash(filepath.Join(outDir, comp))
+		before[comp] = filesHash(outDir, comp, files)
 	}
 	for p, b := range files {
 		full := filepath.Join(outDir, p)
@@ -59,7 +65,7 @@ func Render(c Config, configDir, outDir string) ([]string, error) {
 	}
 	var changed []string
 	for comp, svc := range Components {
-		if dirHash(filepath.Join(outDir, comp)) != before[comp] {
+		if filesHash(outDir, comp, files) != before[comp] {
 			changed = append(changed, svc)
 		}
 	}
@@ -67,24 +73,27 @@ func Render(c Config, configDir, outDir string) ([]string, error) {
 	return changed, nil
 }
 
-// dirHash is the sha256 of all file paths and contents under dir (data/ excluded: service state).
-func dirHash(dir string) string {
+// filesHash is the sha256 of the on-disk content of the rendered files of one component (only the
+// files wafctl renders: service state such as prometheus/data or apprise's store and pid files
+// must not trigger a restart).
+func filesHash(outDir, comp string, files map[string][]byte) string {
+	var paths []string
+	for p := range files {
+		if strings.HasPrefix(p, comp+"/") {
+			paths = append(paths, p)
+		}
+	}
+	sort.Strings(paths)
 	h := sha256.New()
-	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+	for _, p := range paths {
+		b, err := os.ReadFile(filepath.Join(outDir, p))
+		h.Write([]byte(p + "\x00"))
 		if err != nil {
-			return nil
+			h.Write([]byte("\x00missing\x00"))
 		}
-		rel, _ := filepath.Rel(dir, p)
-		if d.IsDir() && (rel == "data") {
-			return filepath.SkipDir
-		}
-		if d.Type().IsRegular() {
-			b, _ := os.ReadFile(p)
-			h.Write([]byte(rel + "\x00"))
-			h.Write(b)
-		}
-		return nil
-	})
+		h.Write(b)
+		h.Write([]byte{0})
+	}
 	return hex.EncodeToString(h.Sum(nil))
 }
 

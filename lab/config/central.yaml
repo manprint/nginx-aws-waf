@@ -1,0 +1,11 @@
+# Lab central config (thresholds lowered so tests/e2e/alerts.sh can trigger them).
+version: 1
+grafana: {bind: "127.0.0.1:3000", root_url: "http://localhost:3000/"}
+alerts:
+  block_spike_per_5m: 20
+  fail_per_5m: 1
+  node_silent_min: 3
+  ingest_lag_min: 5
+  disagreement_per_5m: 200
+apprise: {urls_file: apprise-urls.txt}
+clickhouse: {raw_days: 30, agg_days: 400}

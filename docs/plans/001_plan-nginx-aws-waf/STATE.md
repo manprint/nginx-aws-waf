@@ -9,10 +9,10 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Settings: autonomy true (plan) · WIP on (plan) · deadline none
 - Stop latch: none
 - Scope: plan 001 · RUNNING · overrides none
-- Unit: sub-phase 4.3/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
+- Unit: sub-phase 4.4/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
 - Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
-- Last closure: unit:4.2:1
-- Next: open 4.3 · next eligible: 4.3
+- Last closure: unit:4.3:1
+- Next: open 4.4 · next eligible: 4.4
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -110,6 +110,7 @@ none
 - Do not let an expired CRL stay on the ingress: nginx then rejects every node (R10).
 - Do not expect `nginx -s reload` to reopen the ModSecurity audit log (handles keyed by path survive reloads); rotation flips the audit slot (1.7). `nginx -s reload` is asynchronous: wait on `127.0.0.1:8090/__rev` (1.5).
 - Do not log `$request_method` (GET after the error_page redirect of a block); use `$waf_method` (1.7).
+- Grafana file provisioning expands `$NAME` in contact-point settings: write `$$` (4.3).
 - Grafana custom `allValue` is inserted verbatim (no :format): quote it in the value (4.2).
 - A changed nginx `listen` address cannot be reloaded (EADDRINUSE): restart the waf container (4.1).
 - Do not rename the node Vector file source id: a new id has no checkpoint and re-reads the current logs (duplicate events, P3 review).
@@ -138,8 +139,8 @@ Phase 4 (expanded):
 |----|---------|--------|---------|----------|------------|
 | 4.1 | P3 | DONE | 1 | agent-1 | unit:4.1:1 |
 | 4.2 | 4.1 | DONE | 1 | agent-1 | unit:4.2:1 |
-| 4.3 | 4.2 | IN_PROGRESS | 1 | agent-1 | |
-| 4.4 | 4.3 | TODO | 1 | agent-1 | |
+| 4.3 | 4.2 | DONE | 1 | agent-1 | unit:4.3:1 |
+| 4.4 | 4.3 | IN_PROGRESS | 1 | agent-1 | |
 | P4 | 4.1–4.4 | TODO | 1 | agent-1 | |
 
 README obligation: 1.9 (README rewrite), then 2.5, 3.6, 4.4, 5.5 and 6.5 add sections.

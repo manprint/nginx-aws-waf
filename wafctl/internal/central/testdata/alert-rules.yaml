@@ -1,0 +1,193 @@
+# Rendered by wafctl central render from central.yaml alerts — do not edit.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: waf
+    folder: WAF
+    interval: 1m
+    rules:
+      - uid: waf-block-spike
+        title: "WAF block spike"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: ch
+            model:
+              refId: A
+              datasource: {type: grafana-clickhouse-datasource, uid: ch}
+              editorType: sql
+              queryType: table
+              format: 1
+              rawSql: "SELECT site_id, sum(requests) AS value FROM waf.agg_requests_1m WHERE minute >= now() - INTERVAL 5 MINUTE AND action = 'BLOCK' GROUP BY site_id"
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource: {type: __expr__, uid: __expr__}
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              datasource: {type: __expr__, uid: __expr__}
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [500]}
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "site {{ $labels.site_id }}: {{ $values.B }} blocked requests in 5 min (threshold 500)"
+      - uid: waf-fail
+        title: "WAF fail events"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: ch
+            model:
+              refId: A
+              datasource: {type: grafana-clickhouse-datasource, uid: ch}
+              editorType: sql
+              queryType: table
+              format: 1
+              rawSql: "SELECT site_id, sum(requests) AS value FROM waf.agg_requests_1m WHERE minute >= now() - INTERVAL 5 MINUTE AND action = 'FAIL' GROUP BY site_id"
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource: {type: __expr__, uid: __expr__}
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              datasource: {type: __expr__, uid: __expr__}
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "site {{ $labels.site_id }}: {{ $values.B }} WAF engine failures (500) in 5 min (threshold 1)"
+      - uid: waf-disagree
+        title: "WAF vs AWS default disagreement"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: ch
+            model:
+              refId: A
+              datasource: {type: grafana-clickhouse-datasource, uid: ch}
+              editorType: sql
+              queryType: table
+              format: 1
+              rawSql: "SELECT site_id, sum(requests) AS value FROM waf.agg_requests_1m WHERE minute >= now() - INTERVAL 5 MINUTE AND action != aws_default_action GROUP BY site_id"
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource: {type: __expr__, uid: __expr__}
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              datasource: {type: __expr__, uid: __expr__}
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [200]}
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "site {{ $labels.site_id }}: {{ $values.B }} requests in 5 min where the action differs from the AWS default config (threshold 200)"
+      - uid: waf-node-silent
+        title: "WAF node silent"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: ch
+            model:
+              refId: A
+              datasource: {type: grafana-clickhouse-datasource, uid: ch}
+              editorType: sql
+              queryType: table
+              format: 1
+              rawSql: "SELECT node_id, dateDiff('second', max(ts), now64(3)) AS value FROM waf.heartbeats GROUP BY node_id"
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource: {type: __expr__, uid: __expr__}
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              datasource: {type: __expr__, uid: __expr__}
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [180]}
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "node {{ $labels.node_id }}: no heartbeat for {{ $values.B }} s (threshold 3 min)"
+      - uid: waf-ingest-lag
+        title: "WAF ingest lag"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: ch
+            model:
+              refId: A
+              datasource: {type: grafana-clickhouse-datasource, uid: ch}
+              editorType: sql
+              queryType: table
+              format: 1
+              rawSql: "SELECT site_id, dateDiff('second', max(ts), now64(3)) AS value FROM waf.events WHERE ts > now() - INTERVAL 1 DAY GROUP BY site_id"
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              datasource: {type: __expr__, uid: __expr__}
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              datasource: {type: __expr__, uid: __expr__}
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [300]}
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "site {{ $labels.site_id }}: last event {{ $values.B }} s ago (threshold 5 min): no traffic or ingest stalled; check node-silent first"

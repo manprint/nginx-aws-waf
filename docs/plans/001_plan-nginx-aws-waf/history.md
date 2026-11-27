@@ -203,3 +203,15 @@
   - Provisioning file `grafana/provisioning/alerting/` not yet rendered (4.3); Grafana logs a harmless "can't read alerting provisioning" until then.
 - Visual check (Playwright screenshots, logged in as admin): overview/tuning/explorer/nodes render with data, no panel errors.
 - G-U42: TestG1_ PASS; gen-dashboards.py --check OK; check-dashboards.sh ALL PASS (31 queries incl. variables; a broken SQL is reported FAIL with the CH error); grafana.sh ALL PASS (4 dashboards in folder WAF, ch/prom health OK, anonymous 401, viewer read-only 403 on write, dup user rejected); apply idempotent (grafana not restarted when unchanged); metrics.sh, apply.sh ALL PASS.
+
+## 4.3 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW internal/central/alerts.go (5 rules from thresholds, contact point, policies, apprise yml), deploy/compose/lab/alert_sink.py, tests/e2e/alerts.sh, lab/config/central.yaml (block_spike_per_5m 20), lab/config/apprise-urls.txt (json://alert-sink:8000/, committed: no secret). WRITE render.go (apprise component; change detection on rendered files only), central.yml (apprise 2.2.0, alert-sink profile test), Makefile + scripts/lab-env.sh (`COMPOSE_PROFILES=test` for the lab; apprise dir).
+- Deviations / findings (non-weakening):
+  - R6 residual: Grafana **file** provisioning expands `$NAME` in contact-point settings, so the verified template's `$t` arrived empty (`template: :1: unexpected ":=" in command`). Rendered as `$$t`; the stored template is the verified one (checked via the receivers API). Rule annotations (`$labels`, `$values`) are not expanded.
+  - apprise/waf.yml tags every URL `waf` (`- "url":\n    - tag: waf`), not a bare list: the contact point notifies `tag: waf` and apprise only notifies URLs carrying the requested tag (apprise-api README). URLs are JSON-quoted.
+  - T-AL5 load: `oha -H 'User-Agent:'` still sends oha's User-Agent (requests were ALLOWed). The spike uses an XSS query argument (CrossSiteScripting_QUERYARGUMENTS, 403) with oha; same 300 blocked requests on demo.
+  - Change detection hashes only the files wafctl renders (filesHash): apprise writes `.scheduler.pid`/`store/` into /config, which restarted apprise on every apply with a dir hash. Test extended (state files ignored; a threshold change restarts only grafana).
+  - Receiver test API needs body `{"integration": <spec.integrations[0]>}`; receiver name is the base64 uid (`YXBwcmlzZQ`), looked up by title in alerts.sh.
+  - In the lab `waf-ingest-lag` fires for idle sites (by design: "no traffic or ingest stalled"); documented in 4.4.
+- Observed once: `tests/e2e/cli.sh` FAILED 2 checks right after the regression loop (output not kept); not reproduced in 8 reruns (incl. the same sequence). Suspect ingest timing (raw vs ClickHouse counts). Watch in G-P4.
+- G-U43: TestAL1_ (rules golden, fail threshold gt 0), TestAL2_ (apprise skips comments, empty → `urls: []`) PASS; alerts.sh ALL PASS (T-AL3 5 rules ok; T-AL4 `[WAF] TestAlert` at the sink; T-AL5 `[WAF] WAF block spike` "site demo: 306 blocked requests in 5 min (threshold 20)" after 205 s). grafana, metrics, central, apply ALL PASS; test-e2e 62/62.
