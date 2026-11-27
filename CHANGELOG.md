@@ -13,6 +13,8 @@
 - `rule_groups[].enabled: false` spegne senza avvisi un gruppo abilitato da un profilo padre.
 - Scope-down: ID `1600000 + siteIdx·1000 + groupIdx·10` (prima `·100`, bastava per < 10 gruppi).
 - Stack Odoo: `waf_causa` descrive in italiano le nuove regole.
+- Profilo `odoo-common`: `BlockSensitiveFiles`, `BlockScannerProbes` e `OdooBlockScriptProbes`
+  (script PHP/ASP/JSP e percorsi WordPress) in count, da portare a block dopo la verifica.
 - Corpus `tests/corpus/profiles.yaml` (siti di lab `p-<profilo>`).
 
 ## 0.1.0 — 27-11-2026

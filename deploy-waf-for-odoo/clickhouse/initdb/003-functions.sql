@@ -18,6 +18,7 @@ CREATE OR REPLACE FUNCTION waf_causa AS (rule_name, terminating_type) -> multiIf
     rule_name = 'BlockDebugMethods',                     'Metodo HTTP di debug (TRACE, TRACK, DEBUG, CONNECT)',
     rule_name = 'BlockPhpProbes',                        'Webshell o pagina di diagnostica PHP (phpinfo.php, shell.php, ...)',
     rule_name = 'BlockDbAdminTools',                     'Strumento di amministrazione database (phpMyAdmin, Adminer)',
+    rule_name = 'OdooBlockScriptProbes',                 'Script PHP/ASP/JSP o percorso WordPress (Odoo non li usa: scansione)',
     rule_name = 'BlockServerSideScripts',                'Script lato server su un sito statico (.php, .asp, .jsp, ...)',
     rule_name = 'BlockWriteMethods',                     'Metodo di scrittura (POST/PUT/DELETE) su un sito statico',
     rule_name LIKE 'WordPressBlockUserEnum%',            'Enumerazione degli utenti WordPress (?author=, /wp/v2/users)',

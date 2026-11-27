@@ -103,6 +103,17 @@ password creano, copiano, scaricano o cancellano un database:
 Il percorso viene decodificato e messo in minuscolo prima del confronto: varianti come
 `/Web//Database/%6Danager` sono bloccate.
 
+**Sonde dei bot** (profilo `odoo-common`, quindi tutti i profili Odoo): tre regole in **count**,
+per ora solo registrate. Odoo non serve né file riservati né script PHP, quindi queste richieste
+sono solo scansioni. Dopo qualche giorno senza falsi positivi (dashboard "WAF Richieste", regola
+in count) si passano a block ridefinendole in `odoo.yaml` con lo stesso nome e `action: block`.
+
+| Regola | Registra |
+|---|---|
+| `BlockSensitiveFiles` | `.env`, `.git/`, `.svn/`, `.aws/`, chiavi SSH, `.htaccess`, `composer.json`, `docker-compose.yml`, backup e dump (`backup.zip`, `dump.sql`...) |
+| `BlockScannerProbes` | percorsi cercati dagli scanner di exploit: phpunit, Spring actuator, Laravel ignition, `cgi-bin/`, router e VPN, Tomcat manager, `server-status` |
+| `OdooBlockScriptProbes` | script `.php`, `.asp`, `.jsp`, `.cgi` (`wp-login.php`, `xmlrpc.php`, `phpinfo.php`, phpMyAdmin...) e `/wp-admin/`, `/wp-content/`, `/wp-includes/` |
+
 Tutto si configura in `config/sites/odoo.yaml`, senza toccare i profili (in fondo al file ci sono
 gli esempi commentati), e viene applicato entro 10 secondi:
 

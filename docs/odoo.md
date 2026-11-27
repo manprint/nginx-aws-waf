@@ -42,6 +42,10 @@ flussi legittimi 0 blocchi, `make test-odoo` 48/48 su ogni sito.
 | `CrossSiteScripting_BODY` | count | `OdooXssBodyOutsideEditor` | `/web/dataset/`, `/mail/`, `/html_editor/`, `/web_editor/`, `/website/` |
 | `GenericRFI_BODY` | count | `OdooRfiBodyOutsideRpc` | `/web/dataset/`, `/mail/`, `/html_editor/`, `/web_editor/`, `/website/` |
 
+Sonde dei bot, in **count** (da verificare prima di metterle in block): `BlockSensitiveFiles` e
+`BlockScannerProbes` (stesse regex del profilo `web-common`) e `OdooBlockScriptProbes` (`.php`,
+`.asp`, `.jsp`, `.cgi` e `/wp-admin/`, `/wp-content/`, `/wp-includes/`: Odoo non li serve mai).
+
 Perché, con le righe della matrice (`docs/lab-matrix-001.md`, solo richieste legit
 `X-Waf-Test: <RUN_ID>-legit`, 26-11-2026):
 

@@ -9,6 +9,22 @@ rule_groups:
       CrossSiteScripting_BODY: count
       GenericRFI_BODY: count
 custom_rules:
+  # --- Sonde dei bot (in count per verifica: dopo qualche giorno senza falsi positivi mettere action: block).
+  # Odoo non serve file riservati né script PHP/ASP/JSP: queste richieste sono solo scansioni.
+  # Disattivabili nel sito con  disable_custom_rules: [BlockSensitiveFiles, BlockScannerProbes, OdooBlockScriptProbes]
+  - name: BlockSensitiveFiles
+    slot: start
+    action: count
+    match: {all: [{uri_path: {regex: '(?:^|/)\.(?:git|svn|hg|bzr|aws|ssh|kube|idea|vscode|docker)(?:/|$)|(?:^|/)(?:\.(?:env(?:\.[\w.-]+)?|gitignore|gitconfig|ds_store|htaccess|htpasswd|user\.ini|npmrc|yarnrc|dockerenv|bash_history|mysql_history|psql_history|python_history)|(?:composer|package)(?:-lock)?\.json|composer\.lock|yarn\.lock|docker-compose(?:\.[\w-]+)?\.ya?ml|dockerfile|web\.config|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?|(?:backup|backups|dump|database|db|site|www|htdocs|public_html|wwwroot|data|sql)\.(?:zip|tar|tgz|tar\.gz|gz|bz2|rar|7z|sql|sql\.gz|bak))$', transform: [urlDecodeUni, lowercase]}}]}
+  - name: BlockScannerProbes
+    slot: start
+    action: count
+    match: {all: [{uri_path: {regex: '^/(?:cgi-bin/|vendor/phpunit/|hnap1(?:/|$)|boaform/|gponform/|actuator(?:/|$)|_ignition/|telescope/requests|debug/default/view|jmx-console|invoker/(?:jmx|ejb)invokerservlet|wls-wsat/|_async/asyncresponseservice|remote/fgt_lang|\+cscoe\+/|dana-na/|mifs/|global-protect/(?:login|portal)\.esp|sslvpn_logon\.shtml|cf_scripts/|setup\.cgi|server-(?:status|info)(?:/|$)|_profiler/|console/(?:login/loginform\.jsp|css/)|manager/(?:html|text)(?:/|$)|ws_utc/|druid/index\.html|nacos/|solr/admin|owa/auth/x\.js|autodiscover/autodiscover\.json|stalker_portal/|ztp/cgi-bin|shell$)', transform: [urlDecodeUni, lowercase]}}]}
+  # .php/.asp/.jsp/.cgi e percorsi WordPress (wp-login.php, xmlrpc.php, phpinfo.php, /wp-admin/, phpmyadmin/index.php...)
+  - name: OdooBlockScriptProbes
+    slot: start
+    action: count
+    match: {all: [{uri_path: {regex: '\.(?:php\d?|phtml|phar|asp|aspx|ashx|asmx|axd|jsp|jspx|cgi|pl|cfm|shtml)$|^/(?:wp-admin|wp-content|wp-includes|wordpress)(?:/|$)', transform: [urlDecodeUni, lowercase]}}]}
   - name: OdooBodySizeOutsideRpc
     slot: after:AWSManagedRulesCommonRuleSet
     action: block
