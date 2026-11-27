@@ -8,6 +8,11 @@ Tutti i comandi partono dalla root del repo dopo `source scripts/lab-env.sh`.
 | Corpus richieste | `make test-e2e` | avvia il lab minimo e lancia `wafctl test run --suite tests/corpus` |
 | Smoke del nodo | `tests/e2e/smoke.sh` | 200/403/444, log che crescono, T-R12 |
 | Apply/bypass/explain | `tests/e2e/apply.sh` | I-5: un apply fallito non tocca la config attiva |
+| Join log / centrale | `tests/e2e/joinlog.sh`, `tests/e2e/central.sh` | eventi uniti, inoltro a ClickHouse, GeoIP, heartbeat |
+| CLI osservabilità | `tests/e2e/cli.sh` | `logs`, `export`, `stats`, `report`, `ch` |
+| Metriche | `tests/e2e/metrics.sh` | target Prometheus up, metriche nginx e host per `node_id` |
+| Grafana | `tests/e2e/grafana.sh`, `scripts/check-dashboards.sh` | dashboard, datasource, utenti, ogni query dei pannelli |
+| Alert | `tests/e2e/alerts.sh` | regole sane, test del contact point, picco di blocchi → notifica all'`alert-sink` (~4 min) |
 
 ## Corpus (`tests/corpus/*.yaml`)
 

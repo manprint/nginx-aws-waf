@@ -84,13 +84,27 @@ Le password di ClickHouse si generano una sola volta sul centrale:
 wafctl secrets init          # crea $WAF_CONFIG_DIR/secrets.env (0600); --force le rigenera
 ```
 
-Il file contiene `WAF_CH_ADMIN_PASSWORD`, `WAF_CH_INGEST_PASSWORD` e `WAF_CH_RO_PASSWORD`. `wafctl`
-lo passa al compose con `--env-file`. È escluso da git e non va mai committato.
+Il file contiene `WAF_CH_ADMIN_PASSWORD`, `WAF_CH_INGEST_PASSWORD`, `WAF_CH_RO_PASSWORD` e
+`GF_ADMIN_PASSWORD` (admin di Grafana). `wafctl` lo passa al compose con `--env-file`. È escluso da
+git e non va mai committato. Rilanciare `wafctl secrets init` aggiunge solo le chiavi mancanti.
 
 Le password vengono applicate solo al **primo** avvio di ClickHouse (`initdb`). Se le rigeneri
 dopo, devi aggiornare anche gli utenti in ClickHouse, oppure ripartire da `clickhouse/` vuota.
 
 Quando cambia `vector/forward.yaml` (indirizzo del centrale), `wafctl apply` riavvia `vector`.
+
+Sul centrale `wafctl apply` legge anche `$WAF_CONFIG_DIR/central.yaml` (Grafana, soglie degli
+alert, file degli URL apprise, retention). Prima del compose up genera in `$WAF_CENTRAL_DIR` i
+file di Prometheus, Grafana (datasource, dashboard, alert) e apprise, e riavvia solo i servizi i
+cui file sono cambiati. Gli stessi file si generano senza applicare con `wafctl central render`.
+Nel repo del centrale metti `apprise-urls.txt` nel `.gitignore`: contiene token.
+Dettagli in [dashboards-alerts.md](dashboards-alerts.md).
+
+Cambiare l'indirizzo `listen` di nginx (per esempio la porta di stato 8090 in bridge) non si
+applica con un reload, perché nginx non riesce a fare il bind (`Address in use`). In quel caso
+`wafctl apply` ripristina `current` alla revisione precedente e lo segnala. Esegui
+`docker compose restart waf` (oppure `docker restart <progetto>-waf-1`) e poi di nuovo
+`wafctl apply`.
 
 Sul centrale, dopo ogni aggiornamento di `wafctl`:
 

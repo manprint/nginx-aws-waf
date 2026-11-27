@@ -62,20 +62,37 @@ wafctl stats --since 1h --raw .run/raw                 # offline, senza ClickHou
 Dettagli (flusso, tabelle, campi, mappatura AWS, retention, GeoIP):
 [docs/observability.md](docs/observability.md).
 
+### Dashboard e alert
+
+Il centrale ha anche Prometheus (metriche di nginx, host e Vector per nodo), Grafana su
+`127.0.0.1:3000` con 4 dashboard (Overview, Rules & Tuning, Request Explorer, Nodes Health) e
+5 alert. Gli alert sono notificati tramite apprise a Slack, Google Chat, Telegram, ecc.
+
+```sh
+ssh -N -L 3000:127.0.0.1:3000 utente@centrale        # accesso da remoto (o Tailscale: grafana.bind)
+grep GF_ADMIN_PASSWORD lab/config/secrets.env         # password di admin
+wafctl grafana user add mario --role Viewer           # utente in sola lettura, password stampata una volta
+echo 'slack://TokenA/TokenB/TokenC/#waf' >> $WAF_CONFIG_DIR/apprise-urls.txt && wafctl apply
+```
+
+Soglie in `$WAF_CONFIG_DIR/central.yaml`; pannelli, alert e apprise:
+[docs/dashboards-alerts.md](docs/dashboards-alerts.md).
+
 ## Mappa delle directory
 
 | Percorso | Contenuto |
 |---|---|
 | `waf/` | catalogo regole, file dati, pagine 403/500, Dockerfile del motore |
-| `wafctl/` | CLI Go (`validate`, `render`, `apply`, `diff`, `explain`, `bypass`, `test`, `logs`, `stats`, `report`, `ch`, `secrets`, `catalog`) |
+| `wafctl/` | CLI Go (`validate`, `render`, `apply`, `diff`, `explain`, `bypass`, `test`, `logs`, `stats`, `report`, `ch`, `secrets`, `central`, `grafana`, `catalog`) |
 | `profiles/` | profili di prodotto (`aws-default`, `shadow`, `strict`, `odoo-*`) |
 | `lab/config/` | configurazione del nodo di lab (`node.yaml`, `sites/`) |
 | `deploy/compose/` | compose del nodo (`node.yml` + `node.host.yml` / `node.bridge.yml`), del centrale (`central.yml`, `central.bridge.yml`), lab |
 | `deploy/clickhouse/` | schema iniziale, utenti, config di ClickHouse |
+| `deploy/grafana/` | tabella dei pannelli (`panels.py`) e dashboard JSON generate (`make dashboards`) |
 | `deploy/vector/` | pipeline Vector del nodo (eventi uniti in JSONL, inoltro) e del centrale (GeoIP → ClickHouse) |
 | `deploy/systemd/` | timer per bypass e rotazione log |
 | `tests/` | corpus di richieste, e2e, flussi legittimi Playwright (`tests/legit/`) |
-| `scripts/` | fetch, `lab-env.sh`, `ngx-test.sh`, `bench.sh`, `lab-attack.sh`, `lab-matrix.sh` (+ `sql/`) |
+| `scripts/` | fetch, `lab-env.sh`, `ngx-test.sh`, `bench.sh`, `lab-attack.sh`, `lab-matrix.sh` (+ `sql/`), `gen-dashboards.py`, `check-dashboards.sh` |
 | `data/` | liste IP e definizioni AWS scaricate |
 | `docs/` | documentazione (sotto) e piani (`docs/plans/`) |
 
@@ -86,6 +103,7 @@ Dettagli (flusso, tabelle, campi, mappatura AWS, retention, GeoIP):
 - [docs/tuning.md](docs/tuning.md) — flusso shadow → count + label rule → enforce, bypass
 - [docs/operations.md](docs/operations.md) — percorsi, apply/rollback, systemd, log, centrale, segreti
 - [docs/observability.md](docs/observability.md) — eventi, ClickHouse, `wafctl logs/stats/report`, export AWS
+- [docs/dashboards-alerts.md](docs/dashboards-alerts.md) — Grafana, dashboard, alert, apprise, utenti, accesso
 - [docs/performance.md](docs/performance.md) — benchmark
 - [docs/odoo.md](docs/odoo.md) — profili Odoo, eccezioni, lab, tuning di un modulo
 - [docs/lab-matrix-001.md](docs/lab-matrix-001.md) — matrice di lab finale del piano 001

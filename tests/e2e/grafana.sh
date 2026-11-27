@@ -6,7 +6,7 @@ WAFCTL="${WAFCTL:-$ROOT/wafctl/bin/wafctl}"
 SECRETS="${WAF_CONFIG_DIR:-$ROOT/lab/config}/secrets.env"
 PW="${GF_ADMIN_PASSWORD:-$(sed -n 's/^GF_ADMIN_PASSWORD=//p' "$SECRETS")}"
 GU="${WAF_GRAFANA_URL:-http://127.0.0.1:3000}"
-g() { curl -s -u "admin:$PW" "$GU$1"; }
+g() { curl -s -u "admin:$PW" "$GU$1" "${@:2}"; }
 for ((i=0; i<60; i++)); do [[ "$(g /api/health | jq -r .database 2>/dev/null)" == ok ]] && break; sleep 2; done
 folder=$(g /api/folders | jq -r '.[] | select(.title == "WAF") | .uid')
 n=$(g "/api/search?folderUIDs=$folder&type=dash-db" | jq -r '[.[].uid] | sort | join(",")')
