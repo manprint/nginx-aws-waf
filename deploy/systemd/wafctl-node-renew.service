@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew the WAF node client certificate when it expires in < 30 days (wafctl node renew)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/wafctl
+ExecStart=/usr/local/bin/wafctl node renew

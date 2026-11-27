@@ -4,14 +4,16 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"net"
-	"nginxawswaf/wafctl/internal/central"
-	"nginxawswaf/wafctl/internal/config"
+	"net/http"
 	"os"
 	"path/filepath"
 	"text/tabwriter"
 	"time"
 
+	"nginxawswaf/wafctl/internal/central"
+	"nginxawswaf/wafctl/internal/config"
 	"nginxawswaf/wafctl/internal/env"
 	"nginxawswaf/wafctl/internal/pki"
 )
@@ -22,7 +24,8 @@ const pkiUsage = `usage: wafctl pki <command>
   revoke <serial|cn>                              revoke + regenerate the CRL
   list [--format table|json]
   crl                                             regenerate the CRL (daily timer)
-  token --cn CN [--ttl 24h]                       one-time enrollment token`
+  token --cn CN [--ttl 24h]                       one-time enrollment token
+  serve [--addr :6001] [--rate 10]                enrollment API (systemd wafctl-pki.service)`
 
 // pkiHooks run after the CRL changed (5.2: copy to the ingress and reload it).
 var pkiAfterCRL = func(s *pki.Store) error { return nil }
@@ -34,6 +37,14 @@ func cmdPKI(args []string) int {
 	s := pki.Open(env.PKIDir())
 	sub, rest := args[0], args[1:]
 	switch sub {
+	case "serve":
+		fs := flag.NewFlagSet("pki serve", flag.ContinueOnError)
+		addr := fs.String("addr", ":6001", "listen address")
+		rate := fs.Int("rate", 10, "requests per minute per client IP")
+		if err := fs.Parse(rest); err != nil {
+			return 2
+		}
+		return pkiServe(s, *addr, *rate)
 	case "init":
 		fs := flag.NewFlagSet("pki init", flag.ContinueOnError)
 		name := fs.String("name", "", "CA name (subject CN=nginx-aws-waf CA <name>)")
@@ -184,6 +195,27 @@ func writeCertFiles(dir, name string, cert, key, ca []byte) error {
 
 func init() {
 	pkiAfterCRL = publishCRL
+}
+
+// pkiServe runs the enrollment API with the ingress server cert (rendered by central render).
+func pkiServe(s *pki.Store, addr string, rate int) int {
+	ca, err := s.CACert()
+	if err != nil {
+		return fail("%v", err)
+	}
+	d := central.IngressCertsDir(env.CentralDir())
+	cfg, err := pki.TLSConfig(filepath.Join(d, "ingress.pem"), filepath.Join(d, "ingress.key"), ca)
+	if err != nil {
+		return fail("server cert (run wafctl central render or apply first): %v", err)
+	}
+	lg := log.New(os.Stderr, "pki-serve ", log.LstdFlags|log.LUTC)
+	srv := &http.Server{Addr: addr, Handler: (&pki.Server{Store: s, Rate: rate, Log: lg}).Handler(), TLSConfig: cfg,
+		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, ErrorLog: lg}
+	lg.Printf("listening on %s (ca_sha256=%s)", addr, pki.Fingerprint(ca))
+	if err := srv.ListenAndServeTLS("", ""); err != nil {
+		return fail("%v", err)
+	}
+	return 0
 }
 
 // publishCRL copies crl.pem to the ingress certs dir and reloads the ingress when it runs.

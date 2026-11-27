@@ -29,13 +29,16 @@ type Index struct {
 	Certs     []Entry `json:"certs"`
 }
 
-// Status of e at now: revoked, expired, expiring (< RenewBefore left) or valid.
+// Status of e at now: revoked, expired, renewed (replaced, still valid until it expires),
+// expiring (< RenewBefore left) or valid.
 func (e Entry) Status(now time.Time) string {
 	switch {
 	case e.RevokedAt != nil:
 		return "revoked"
 	case !now.Before(e.NotAfter):
 		return "expired"
+	case e.RenewedBy != nil:
+		return "renewed"
 	case e.NotAfter.Sub(now) < RenewBefore:
 		return "expiring"
 	}
@@ -115,6 +118,43 @@ func (s *Store) List() ([]Entry, error) {
 		return err
 	})
 	return out, err
+}
+
+// Lookup returns the index entry of serial (nil when unknown).
+func (s *Store) Lookup(serial string) (*Entry, error) {
+	var out *Entry
+	err := s.locked(func() error {
+		ix, err := s.readIndex()
+		if err != nil {
+			return err
+		}
+		for i := range ix.Certs {
+			if ix.Certs[i].Serial == serial {
+				e := ix.Certs[i]
+				out = &e
+			}
+		}
+		return nil
+	})
+	return out, err
+}
+
+// MarkRenewed records that oldSerial was replaced by newSerial (it is not revoked).
+func (s *Store) MarkRenewed(oldSerial, newSerial string) error {
+	return s.locked(func() error {
+		ix, err := s.readIndex()
+		if err != nil {
+			return err
+		}
+		for i := range ix.Certs {
+			if ix.Certs[i].Serial == oldSerial {
+				n := newSerial
+				ix.Certs[i].RenewedBy = &n
+				return s.writeIndex(ix)
+			}
+		}
+		return fmt.Errorf("pki: unknown serial %s", oldSerial)
+	})
 }
 
 // writeAtomic writes path via a temp file + rename with the given mode.

@@ -153,3 +153,19 @@ func isP256(pub any) bool {
 	k, ok := pub.(*ecdsa.PublicKey)
 	return ok && k.Curve == elliptic.P256()
 }
+
+// NewCSR generates a P-256 key and a CSR with CN = cn (node side of enroll/renew).
+func NewCSR(cn string) (keyPEM, csrPEM []byte, err error) {
+	k, err := newKey()
+	if err != nil {
+		return nil, nil, err
+	}
+	der, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{Subject: pkix.Name{CommonName: cn}}, k)
+	if err != nil {
+		return nil, nil, err
+	}
+	if keyPEM, err = KeyPEM(k); err != nil {
+		return nil, nil, err
+	}
+	return keyPEM, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: der}), nil
+}

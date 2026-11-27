@@ -264,3 +264,29 @@
 - Decision (non-weakening): all-in-one keeps the local hop in plaintext, either on the compose network or on loopback, because both ends run on the same host. Every remote hop uses mTLS.
 - Stream access log lines are written at session end, and Vector's session is long-lived. So the ingress is verified with openssl handshake probes: no cert → `"-" NONE 500`, node cert → `CN=lab-node-2 SUCCESS 200`.
 - G-U52: TestING1_ + TestFWD1_ PASS (2). multinode.sh part1 ALL PASS: T-MN1 delivered 20/20 node-2 events to ClickHouse through the ingress. Regression: central/smoke/apply/metrics ALL PASS. `wafctl pki crl` → CRL published and the ingress reloaded.
+
+## 5.3 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW pki/serve.go: `Server` (GET /ca, POST /enroll, POST /renew, GET /healthz).
+  - Per-IP token bucket: 10/min, 429 when exhausted.
+  - Request bodies: max 64 KB, unknown fields rejected.
+  - Auth failures return a generic message; malformed input returns 400.
+  - /enroll validates the CSR (PEM, signature, P-256, CN regex) before `UseToken(token, csr CN)`, so a malformed or mismatching CSR does not burn the token. A CN mismatch or a bad, used or expired token → 403.
+  - /renew requires a verified client cert with the ClientAuth EKU (none → 401). The index entry must be known, match the CN, be unrevoked and unexpired (otherwise 403). The CSR CN must equal the cert CN. The old serial gets `renewed_by`; it is not revoked.
+  - `TLSConfig` uses the ingress server cert with `VerifyClientCertIfGiven` against the CA.
+- NEW pki serve_test.go and issue.go `NewCSR`. index.go gains `Lookup` and `MarkRenewed`; Status gains `renewed`.
+- NEW node/{enroll,renew,node_test}.go:
+  - enroll fetches /ca with InsecureSkipVerify and pins the DER sha256 (mismatch → abort before anything is written). It then verifies the server against the pinned CA and checks that the returned cert matches the CA, CN and key. Files are written as `.new` + rename, with node.key 0600.
+  - renew skips when > 30 d remain unless `--force`, then calls /renew over mTLS with the current cert.
+  - Requests time out after 15 s.
+- NEW cmd/wafctl/node.go: `node enroll|renew`. The default central is central.address:pki_port; vector is restarted if running.
+- WRITE cmd pki.go: `pki serve [--addr :6001] [--rate 10]`, using the ingress cert and logging in UTC.
+- NEW systemd units: wafctl-pki.service (Restart=always, outside Docker, I-8) and wafctl-node-renew.{service,timer} (daily, RandomizedDelaySec=1h).
+- Lab central.yaml: ingress server_ips [127.0.0.1].
+- Plan correction (non-weakening): the ingress gains `worker_shutdown_timeout 10s`. After the CRL reload, old workers would otherwise keep a revoked node's long-lived Vector session for up to proxy_timeout (10 m). With the timeout, the session drops within 10 s and the reconnect is checked against the new CRL. Without this, T-MN5 could not hold.
+- G-U53: TestSRV1_–TestSRV4_ + TestND1_ PASS (5).
+- multinode.sh (full) ALL PASS in about 70 s:
+  - T-MN2: enroll with the token, wrong pin aborted, node.key 0600, events delivered.
+  - T-MN3: token reuse → HTTP 403.
+  - T-MN4: renew skips while the cert is fresh; `--force` issues a new serial, the old one shows `renewed`, and traffic flows.
+  - T-MN5: revoke reloads the ingress; after 20 s there are 0 events, and the ingress logs "certificate revoked".
+  - Cleanup: re-enroll delivers the 20 buffered events (disk buffer, no loss).

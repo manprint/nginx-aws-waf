@@ -1,0 +1,15 @@
+[Unit]
+Description=WAF PKI enrollment API (wafctl pki serve, port 6001): runs on the central host, outside Docker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=-/etc/default/wafctl
+ExecStart=/usr/local/bin/wafctl pki serve --addr :6001
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

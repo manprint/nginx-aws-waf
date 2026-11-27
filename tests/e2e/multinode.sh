@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Multi-node over mTLS (P5). Part 1 (T-MN1): lab-node-2 (project waf2, data .run2, :18080) with a
 # manually issued client cert forwards through the central ingress into ClickHouse.
+# Part 2 (T-MN2..5): enroll with a one-time token via `wafctl pki serve`, token reuse refused,
+# renew --force, revoke → the ingress refuses node 2.
 # Usage: tests/e2e/multinode.sh [part1]
 set -uo pipefail
 source "$(dirname "$0")/lib.sh"
@@ -46,4 +48,53 @@ probe() { echo | timeout 5 openssl s_client -connect 127.0.0.1:6000 -servername 
 check "MN1-ingress-rejects-no-cert" bash -c "$(declare -f probe); D='$D'; probe | grep -q '\"-\" NONE 500'"
 check "MN1-ingress-accepts-node-cert" bash -c "$(declare -f probe); D='$D'; probe -cert '$D/node.pem' -key '$D/node.key' | grep -q 'CN=lab-node-2\" SUCCESS 200'"
 [[ "$PART" == part1 ]] && { finish; exit 0; }
+
+# --- part 2: enrollment, renewal, revocation
+serial_of() { "$W" pki list --format json | jq -r --arg s "$1" '.[] | select(.serial == $s) | .status'; }
+cur_serial() { openssl x509 -in "$N2_DATA/certs/_node/node.pem" -noout -serial | cut -d= -f2 | tr A-F a-f; }
+"$W" pki serve --addr 127.0.0.1:6001 > /tmp/mn-pki-serve.log 2>&1 &
+SERVE=$!
+trap 'kill $SERVE 2>/dev/null' EXIT
+for ((t=0; t<20; t++)); do curl -sk https://127.0.0.1:6001/healthz | grep -q ok && break; sleep 0.5; done
+rm -rf "$N2_DATA/certs/_node"
+out=$("$W" pki token --cn lab-node-2 --ttl 1h)
+tok=$(sed -n 's/^token=//p' <<<"$out"); fp=$(sed -n 's/^ca_sha256=//p' <<<"$out")
+n2 node enroll --central 127.0.0.1:6001 --token "$tok" --ca-sha256 "$(printf '0%.0s' {1..64})" > /tmp/mn-pin.out 2>&1
+check "MN2-enroll-wrong-pin-aborts" grep -q "fingerprint mismatch" /tmp/mn-pin.out
+n2 node enroll --central 127.0.0.1:6001 --token "$tok" --ca-sha256 "$fp" > /tmp/mn-enroll.out 2>&1; rc=$?
+check "MN2-enroll (rc=$rc)" test "$rc" = 0
+check "MN2-node-key-0600" test "$(stat -c %a "$N2_DATA/certs/_node/node.key" 2>/dev/null)" = 600
+s1=$(cur_serial)
+check "MN2-pki-list-valid" test "$(serial_of "$s1")" = valid
+tag="mn2-$(date +%s)"; send 10 "$tag"
+c=$(wait_count "SELECT count() FROM waf.events WHERE node_id = 'lab-node-2' AND startsWith(path, '/mn/$tag')" 10 40)
+check "T-MN2 enrolled node2 forwards ($c >= 10)" test "$c" -ge 10
+n2 node enroll --central 127.0.0.1:6001 --token "$tok" --ca-sha256 "$fp" > /tmp/mn-reuse.out 2>&1
+check "T-MN3 token reuse refused (403)" grep -q "HTTP 403" /tmp/mn-reuse.out
+n2 node renew --central 127.0.0.1:6001 > /tmp/mn-renew0.out 2>&1
+check "MN4-renew-skips-fresh" grep -q "nothing to do" /tmp/mn-renew0.out
+n2 node renew --central 127.0.0.1:6001 --force > /tmp/mn-renew.out 2>&1; rc=$?
+s2=$(cur_serial)
+check "T-MN4 renew --force: new serial (rc=$rc)" test "$rc" = 0 -a "$s2" != "$s1" -a "$(serial_of "$s2")" = valid
+check "T-MN4 old serial renewed" test "$(serial_of "$s1")" = renewed
+tag="mn4-$(date +%s)"; send 10 "$tag"
+c=$(wait_count "SELECT count() FROM waf.events WHERE node_id = 'lab-node-2' AND startsWith(path, '/mn/$tag')" 10 40)
+check "T-MN4 traffic after renew ($c >= 10)" test "$c" -ge 10
+"$W" pki revoke "$s2" > /tmp/mn-revoke.out 2>&1
+check "MN5-revoke-reloads-ingress" grep -q "ingress reloaded" /tmp/mn-revoke.out
+sleep 12   # worker_shutdown_timeout 10s: the old session is dropped, the reconnect hits the new CRL
+tag="mn5-$(date +%s)"; send 20 "$tag"
+sleep 20
+c=$(chq "SELECT count() FROM waf.events WHERE node_id = 'lab-node-2' AND startsWith(path, '/mn/$tag')")
+check "T-MN5 revoked node2 delivers nothing ($c = 0)" test "${c:-x}" = 0
+docker logs --since 40s waf2-vector-1 2>&1 | grep -qiE "handshake|certificate|broken pipe|transport error|connection"
+check "T-MN5 node2 vector logs the refusal" test $? = 0
+docker logs --since 40s waf-ingress-1 2>&1 | grep -q "certificate revoked"
+check "T-MN5 ingress logs certificate revoked" test $? = 0
+# cleanup: fresh cert so the lab keeps working (the buffered mn5 events are then delivered)
+out=$("$W" pki token --cn lab-node-2 --ttl 1h)
+n2 node enroll --central 127.0.0.1:6001 --token "$(sed -n 's/^token=//p' <<<"$out")" --ca-sha256 "$(sed -n 's/^ca_sha256=//p' <<<"$out")" >/dev/null 2>&1
+c=$(wait_count "SELECT count() FROM waf.events WHERE node_id = 'lab-node-2' AND startsWith(path, '/mn/$tag')" 20 60)
+check "MN5-after-reenroll buffered events delivered ($c >= 20)" test "$c" -ge 20
+check "MN-serve-log-has-enroll" grep -q "enroll cn=lab-node-2" /tmp/mn-pki-serve.log
 finish
