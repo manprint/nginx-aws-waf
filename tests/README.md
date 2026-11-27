@@ -12,8 +12,11 @@ Tutti i comandi partono dalla root del repo dopo `source scripts/lab-env.sh`.
 | CLI osservabilità | `tests/e2e/cli.sh` | `logs`, `export`, `stats`, `report`, `ch` |
 | Metriche | `tests/e2e/metrics.sh` | target Prometheus up, metriche nginx e host per `node_id` |
 | Grafana | `tests/e2e/grafana.sh`, `scripts/check-dashboards.sh` | dashboard, datasource, utenti, ogni query dei pannelli |
-| Alert | `tests/e2e/alerts.sh` | regole sane, test del contact point, picco di blocchi → notifica all'`alert-sink` (~4 min) |
+| Alert | `tests/e2e/alerts.sh [--spike-only]` | regole sane, test del contact point, picco di blocchi → notifica all'`alert-sink` (~4 min); `--spike-only` esegue solo il picco |
 | Rate limit | `tests/e2e/ratelimit.sh` | sito `ratelimit` (10 req/60 s, block): 403 oltre il burst, `rl=REJECTED` nell'access log, eventi `RATE_BASED`/`BLOCK`; sito `ratecount` (count): tutto 200, `REJECTED_DRY_RUN` |
+| Export AWS | `make aws-export-check`, `scripts/tf-validate-export.sh FILE.tf` | JSON di ogni sito del lab validato offline con la AWS CLI; Terraform con `terraform validate` in Docker |
+| Liste IP | `wafctl lists update` | tabella `LIST OLD NEW STATUS`; offline tutte `kept` (exit 0) |
+| Accettazione finale | `make final-check` | G-FINAL, 8 passi in ordine (lab-up + corpus, Playwright, ClickHouse ≤ 10 s + stats + dashboard, report HTML, export log AWS, bypass, alert, Terraform); log in `build/final-check/` (~10 min) |
 | PKI | `tests/e2e/pki.sh` | CA, certificati client/server, revoca e CRL verificati con `openssl` (directory temporanea) |
 | Bootstrap | `tests/e2e/bootstrap.sh` | tarball di release installato in un container `ubuntu:24.04` pulito; `install-node.sh` rifiuta senza Docker; `wafctl node bootstrap` + `validate`; un solo commit e nessun segreto tracciato |
 | Multi-nodo | `tests/e2e/multinode.sh [part1]` | secondo nodo `waf2` (`.run2`, porta 18080) che inoltra via mTLS all'ingress; l'ingress rifiuta i client senza certificato. Parte 2 (~1 min): enrollment con token tramite `wafctl pki serve`, riuso del token → 403, `node renew --force`, revoca → nessun evento dal nodo revocato, re-enrollment finale |

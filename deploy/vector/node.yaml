@@ -10,6 +10,9 @@ sources:
     include: [/var/log/waf/access.log, /var/log/waf/audit.log]
     read_from: beginning
     max_line_bytes: 4194304
+    # default 2048 B per file per pass: audit lines with bodies (up to ~1 MiB) took several passes
+    # each and a corpus burst reached the join ~7 s late (6.5 G-FINAL step 3, ≤ 10 s end to end)
+    max_read_bytes: 1048576
   # Heartbeat (3.1): current runtime meta.json (single-line JSON) every 30 s.
   hb_exec:
     type: exec

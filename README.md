@@ -97,22 +97,54 @@ wafctl node enroll --token <T> --ca-sha256 <H>
 Topologia, porte, PKI, revoca, scadenza della CRL, backup della CA, Tailscale e Terraform:
 [docs/multi-node.md](docs/multi-node.md).
 
+## Export verso AWS
+
+Un sito configurato nel lab diventa una web ACL AWS WAFv2, in JSON (input della AWS CLI) o in
+Terraform. Gli elementi `nginx-only` sono elencati come `lossy` e omessi (`--allow-lossy`).
+
+```sh
+wafctl export-aws --site shop18 --format terraform --allow-lossy -o build/aws/shop18.tf
+scripts/tf-validate-export.sh build/aws/shop18.tf      # terraform validate in Docker → VALID
+make aws-export-check                                  # tutti i siti: JSON + validazione offline AWS CLI
+```
+
+Mappatura, passi manuali e applicazione: [docs/aws-export.md](docs/aws-export.md).
+
+## Liste IP e GeoIP
+
+```sh
+wafctl lists update        # aggiorna le liste di reputazione (protezione 50 %), apply se cambiate
+```
+
+Il timer `wafctl-lists` lo esegue ogni giorno. `wafctl-geoip` aggiorna GeoLite2 se c'è un account
+MaxMind. Dettagli in [docs/operations.md](docs/operations.md#liste-ip).
+
+## Accettazione finale
+
+```sh
+make final-check           # G-FINAL: lab-up, corpus, Playwright, ClickHouse ≤ 10 s, report,
+                           # export log AWS, bypass, alert, export Terraform → "G-FINAL step N OK" × 8
+scripts/bench.sh           # G-PERF (docs/performance.md)
+```
+
+Novità per versione: [CHANGELOG.md](CHANGELOG.md).
+
 ## Mappa delle directory
 
 | Percorso | Contenuto |
 |---|---|
 | `waf/` | catalogo regole, file dati, pagine 403/500, Dockerfile del motore |
-| `wafctl/` | CLI Go (`validate`, `render`, `apply`, `diff`, `explain`, `bypass`, `test`, `logs`, `stats`, `report`, `ch`, `secrets`, `central`, `grafana`, `pki`, `node`, `catalog`) |
+| `wafctl/` | CLI Go (`validate`, `render`, `apply`, `diff`, `explain`, `bypass`, `test`, `logs`, `stats`, `report`, `ch`, `secrets`, `central`, `grafana`, `pki`, `node`, `export-aws`, `lists`, `catalog`) |
 | `profiles/` | profili di prodotto (`aws-default`, `shadow`, `strict`, `odoo-*`) |
 | `lab/config/` | configurazione del nodo di lab (`node.yaml`, `sites/`); `lab/config-node2/` è il secondo nodo del lab multi-nodo |
 | `deploy/compose/` | compose del nodo (`node.yml` + `node.host.yml` / `node.bridge.yml`), del centrale (`central.yml` con l'ingress mTLS, `central.bridge.yml`, `central.host.yml`), lab |
 | `deploy/clickhouse/` | schema iniziale, utenti, config di ClickHouse |
 | `deploy/grafana/` | tabella dei pannelli (`panels.py`) e dashboard JSON generate (`make dashboards`) |
 | `deploy/vector/` | pipeline Vector del nodo (eventi uniti in JSONL, inoltro) e del centrale (GeoIP → ClickHouse) |
-| `deploy/systemd/` | timer per bypass, rotazione log, CRL e rinnovo dei certificati; servizio `wafctl-pki` |
+| `deploy/systemd/` | timer per bypass, rotazione log, CRL, rinnovo dei certificati, liste IP e GeoIP; servizio `wafctl-pki` |
 | `deploy/terraform/` | scheletro Terraform AWS (security group, istanze, user-data), solo `make tf-validate` |
 | `tests/` | corpus di richieste, e2e, flussi legittimi Playwright (`tests/legit/`) |
-| `scripts/` | fetch, `lab-env.sh`, `ngx-test.sh`, `bench.sh`, `lab-attack.sh`, `lab-matrix.sh` (+ `sql/`), `gen-dashboards.py`, `check-dashboards.sh`, `build-release.sh`, `install-node.sh` |
+| `scripts/` | fetch, `lab-env.sh`, `ngx-test.sh`, `bench.sh`, `lab-attack.sh`, `lab-matrix.sh` (+ `sql/`), `gen-dashboards.py`, `check-dashboards.sh`, `build-release.sh`, `install-node.sh`, `aws-validate-acl.sh`, `tf-validate-export.sh`, `final-check.sh` |
 | `data/` | liste IP e definizioni AWS scaricate |
 | `docs/` | documentazione (sotto) e piani (`docs/plans/`) |
 
@@ -125,6 +157,7 @@ Topologia, porte, PKI, revoca, scadenza della CRL, backup della CA, Tailscale e 
 - [docs/observability.md](docs/observability.md) — eventi, ClickHouse, `wafctl logs/stats/report`, export AWS
 - [docs/dashboards-alerts.md](docs/dashboards-alerts.md) — Grafana, dashboard, alert, apprise, utenti, accesso
 - [docs/multi-node.md](docs/multi-node.md) — topologia, porte, PKI e mTLS, enrollment/rinnovo/revoca, installazione, Tailscale, Terraform
+- [docs/aws-export.md](docs/aws-export.md) — export verso AWS WAF (JSON, Terraform), mappatura, lossy, validazione
 - [docs/performance.md](docs/performance.md) — benchmark
 - [docs/odoo.md](docs/odoo.md) — profili Odoo, eccezioni, lab, tuning di un modulo
 - [docs/lab-matrix-001.md](docs/lab-matrix-001.md) — matrice di lab finale del piano 001

@@ -6,11 +6,13 @@ source "$(dirname "$0")/lib.sh"
 W="${WAFCTL:-$ROOT/wafctl/bin/wafctl}"
 RAW="${WAF_DATA_DIR:-$ROOT/.run}/raw"
 
+# window of this run only: a benchmark in the last 15 min (oha, ~300k requests) would exceed --limit
+START=$(date -u -d '-5 sec' +%Y-%m-%dT%H:%M:%SZ)
 # corpus run, then wait until its events are in ClickHouse
 corpus=$("$W" test run --suite "$ROOT/tests/corpus" --format json)
 nblock=$(jq '[.results[] | select(.status == 403 and .mode == "enforce" and (.summary|test("site=demo;")))] | length' <<< "$corpus")
 for ((i=0; i<30; i++)); do
-  got=$("$W" logs search --since 15m --format json --limit 100000 --site demo --action BLOCK | jq length)
+  got=$("$W" logs search --from "$START" --format json --limit 100000 --site demo --action BLOCK | jq length)
   (( got >= nblock )) && break; sleep 1
 done
 
@@ -21,8 +23,8 @@ one=$("$W" logs search --since 15m --site demo --action BLOCK --rule NoUserAgent
 check "Q-search-rule-filter" test -n "$one"
 nm=$("$W" logs show "$one" --format json | jq '.matches | length')
 check "Q-show-matches ($nm)" test "${nm:-0}" -ge 1
-from=$(date -u -d '-15 min' +%Y-%m-%dT%H:%M:%SZ); to=$(date -u -d '-5 sec' +%Y-%m-%dT%H:%M:%SZ)
-sleep 6
+from="$START"; to=$(date -u -d '+1 sec' +%Y-%m-%dT%H:%M:%SZ)
+sleep 8  # in-flight events (other sites) of the window
 a=$("$W" logs search --from "$from" --to "$to" --node lab-node-1 --format json --limit 100000 | jq length)
 b=$("$W" logs search --from "$from" --to "$to" --node lab-node-1 --format json --limit 100000 --raw "$RAW" | jq length)
 check "T-Q5-raw-same-count ($a = $b)" test "$a" = "$b"

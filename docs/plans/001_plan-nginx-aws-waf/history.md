@@ -405,3 +405,26 @@
   - Offline (`unshare -rn`): 3× kept, rc 0, files untouched, no apply.
   - A second online run: everything unchanged, apply skipped.
   - Regression: bootstrap.sh ALL PASS, make test-unit 0 FAIL.
+
+## 6.5 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW scripts/final-check.sh with Makefile target `final-check`. It runs the 8 G-FINAL steps in order, stops at the first failure and prints `G-FINAL step N OK (details)`. Logs go to build/final-check/.
+  - Step 3 measures the delay to ClickHouse right after the corpus. It counts events with `request_headers['X-Waf-Test']` starting with the run id, so step 2 (Playwright) does not mask the delay.
+  - Step 6 checks the attack under bypass (≠403, event shadow_action=BLOCK) and a 403 after `bypass clear`. A trap clears the bypass if the script fails.
+  - Step 7 runs `alerts.sh --spike-only`.
+  - Step 8 checks the lossy list from the HCL comments.
+- **BUG found and fixed (Vector, node):** the first final-check run measured about 12 s to ClickHouse, above the 10 s G-FINAL limit.
+  - Measurement: a corpus burst reached raw/ on the node only after about 7 s, all at once. The cause is the file source's default `max_read_bytes` of 2048 B per file per pass, against audit lines that carry bodies.
+  - `deploy/vector/node.yaml` now sets `max_read_bytes: 1048576`. Corpus → ClickHouse now takes 2.7–4.3 s (3.4 s in final-check).
+- tests/e2e/alerts.sh gains `--spike-only` (T-AL5 only).
+- tests/e2e/cli.sh: the window starts when the script starts instead of 15 min back. A benchmark (≈290k requests) had pushed `logs search` past `--limit 100000`. The wait is now on this run's demo blocks, not on blocks from any time in the last 15 min.
+- Docs: NEW docs/aws-export.md (Italian: mapping, lossy, manual steps, validation, manual Terraform apply). NEW CHANGELOG.md (0.1.0 per phase). README gains the AWS export, IP lists/GeoIP and final acceptance sections plus map and docs entries. docs/performance.md has the final G-PERF results. tests/README.md updated.
+- **G-PERF** (bench.sh ×3, full stack, commit 936bbfa), medians:
+  - GET 5151 rps, p99 3.21 ms;
+  - POST 4409 rps, p99 3.62 ms;
+  - RSS 57–59 MB;
+  - every D29 threshold met.
+- **G-U65:** `make final-check` gives 8 × `G-FINAL step N OK`: corpus 67/67, legit 12 passed, 67 events in 3.4 s, 31 panel queries, report 30 KB, AWS export, bypass, alert after 210 s, shop18.tf VALID with lossy=xff.
+- **Regression:**
+  - ALL PASS: smoke, apply, joinlog, central, cli ×3, metrics, grafana, ratelimit, pki, multinode ×3.
+  - The first multinode run FAILED 4: waf2-vector was still running the old config while the file changed. Then 3 consecutive ALL PASS.
+  - make test-unit: 0 FAIL.

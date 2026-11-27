@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Usage: tests/e2e/alerts.sh [--spike-only]
 # Alerts (4.3): provisioned rules healthy (T-AL3), contact point → apprise → alert-sink (T-AL4),
 # a real block spike fires "WAF block spike" end to end (T-AL5). Needs the lab with profile test
 # (alert-sink) and lab/config/central.yaml (block_spike_per_5m: 20).
@@ -13,6 +14,8 @@ g() { curl -s -u "admin:$PW" -H 'Content-Type: application/json' "$@"; }
 sinklog() { docker logs "$SINK" 2>&1 | grep '^ALERT-SINK'; }
 for ((i=0; i<60; i++)); do [[ "$(g "$GU/api/health" | jq -r .database 2>/dev/null)" == ok ]] && break; sleep 2; done
 
+# --spike-only (scripts/final-check.sh step 7): only T-AL5
+if [[ "${1:-}" != --spike-only ]]; then
 # T-AL3: 5 rules, none with health error (wait for the first evaluation)
 for ((i=0; i<12; i++)); do
   rules=$(g "$GU/api/prometheus/grafana/api/v1/rules" | jq -c '[.data.groups[] | select(.name == "waf") | .rules[] | {name, health, lastError}]')
@@ -30,6 +33,8 @@ before=$(sinklog | wc -l)
 res=$(g -X POST "$R/$uid/test" -d "{\"integration\":$integ}" | jq -r .status)
 for ((i=0; i<15; i++)); do sinklog | tail -n +$((before+1)) | grep -q '"title": "\[WAF\] ' && break; sleep 1; done
 check "T-AL4 contact point test delivered ($res)" bash -c "docker logs '$SINK' 2>&1 | grep '^ALERT-SINK' | tail -n +$((before+1)) | grep -q '\"title\": \"\[WAF\] '"
+
+fi
 
 # T-AL5: 300 blocked requests on demo → WAF block spike within 4 min. oha cannot drop the
 # User-Agent header (-H 'User-Agent:' still sends oha's), so the spike uses an XSS query

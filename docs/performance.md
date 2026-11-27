@@ -34,6 +34,32 @@ Run singoli: GET 6109/5932/6101 req/s (p99 2.32/2.65/2.32 ms); POST 5163/5384/52
 (p99 3.38/2.53/2.75 ms). Tutte le soglie D29 rispettate con margine (prototipo R8: GET 4890,
 POST 4231 req/s).
 
+## Risultati finali (27-11-2026, commit 936bbfa, mediana di 3 run, piano 001 G-PERF)
+
+Le misure sono state prese con lo stack completo del lab attivo sullo stesso host:
+
+- nodo WAF con le liste IP reali aggiornate e GeoIP attivo;
+- 4 siti Odoo con i loro Postgres;
+- Vector del nodo e Vector centrale;
+- ingress mTLS, ClickHouse, Prometheus, Grafana, apprise.
+
+Il ruleset include anche i siti opzionali (rate limit, geo).
+
+| Caso | req/s | p50 ms | p99 ms | RSS waf MB |
+|---|---|---|---|---|
+| GET | 5151 | 1.45 | 3.21 | 56.8 |
+| POST JSON-RPC | 4409 | 1.69 | 3.62 | 59.2 |
+
+Run singoli:
+
+- GET: 5194/5128/5151 req/s, p99 3.54/3.21/2.65 ms;
+- POST: 4600/4405/4409 req/s, p99 3.03/3.64/3.62 ms.
+
+Tutte le soglie D29 sono rispettate. Il throughput è più basso di circa il 15 % rispetto alla misura
+del 26-11, perché ora l'host esegue anche i servizi centrali. L'RSS cresce di qualche MB tra un run
+e l'altro (51.9 → 64.4 MB in 6 run): sono le cache di nginx/ModSecurity dei worker, che tornano
+giù al reload.
+
 ## Note
 
 - **Audit log su bind mount.** Con l'audit log nel filesystem overlay del container il p99

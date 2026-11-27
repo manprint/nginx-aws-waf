@@ -31,6 +31,10 @@ aws-export-check: wafctl ## T-EXP7: export-aws JSON of every lab site + offline 
 	  ./wafctl/bin/wafctl export-aws --config lab/config --site $$s --allow-lossy --acl-only -o build/aws/$$s.json 2>/dev/null || rc=1; \
 	  r=$$(./scripts/aws-validate-acl.sh build/aws/$$s.json | tail -1); echo "$$s $$r"; [ "$$r" = VALID ] || rc=1; done; exit $$rc
 
+.PHONY: final-check
+final-check: wafctl ## G-FINAL: reference scenario steps 1-8 (lab up, corpus, legit, ClickHouse, report, export, bypass, alert, terraform)
+	./scripts/final-check.sh
+
 .PHONY: lists
 lists: ## prepare .run/lists for lab renders and nginx -t
 	mkdir -p .run/lists && cp data/ip-reputation/*.txt .run/lists/ && cp data/ip-reputation/custom-test.txt .run/lists/custom-reputation.txt && printf '2001:db8:bad::/48\n' >> .run/lists/custom-reputation.txt && printf '# placeholder\n' > .run/lists/HostingProviderIPList.txt
