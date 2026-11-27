@@ -9,10 +9,10 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Settings: autonomy true (plan) · WIP on (plan) · deadline none
 - Stop latch: none
 - Scope: plan 001 · RUNNING · overrides none
-- Unit: sub-phase 5.1/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
+- Unit: sub-phase 5.2/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
 - Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
-- Last closure: unit:P4:1
-- Next: open 5.1 · next eligible: 5.1
+- Last closure: unit:5.1:1
+- Next: open 5.2 · next eligible: 5.2
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -139,8 +139,8 @@ Phase 4: DONE (unit:P4:1), 4.1–4.4 DONE attempt 1.
 Phase 5 (expanded):
 | ID | Depends | Status | Attempt | Assigned | Ref / note |
 |----|---------|--------|---------|----------|------------|
-| 5.1 | P3 | IN_PROGRESS | 1 | agent-1 | |
-| 5.2 | 5.1 | TODO | 1 | agent-1 | |
+| 5.1 | P3 | DONE | 1 | agent-1 | unit:5.1:1 |
+| 5.2 | 5.1 | IN_PROGRESS | 1 | agent-1 | |
 | 5.3 | 5.2 | TODO | 1 | agent-1 | |
 | 5.4 | 5.3 | TODO | 1 | agent-1 | |
 | 5.5 | 5.4 | TODO | 1 | agent-1 | |

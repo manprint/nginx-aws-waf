@@ -16,3 +16,4 @@ secrets.env
 secrets.env.tmp
 node_modules/
 /tests/legit/test-results/
+/lab/config/pki/

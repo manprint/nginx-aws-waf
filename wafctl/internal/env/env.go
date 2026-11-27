@@ -40,6 +40,9 @@ func DataDir() string { return getenv("WAF_DATA_DIR", "/srv/waf") }
 // CentralDir returns $WAF_CENTRAL_DIR (default $WAF_DATA_DIR/central).
 func CentralDir() string { return getenv("WAF_CENTRAL_DIR", filepath.Join(DataDir(), "central")) }
 
+// PKIDir returns $WAF_PKI_DIR (default $WAF_CONFIG_DIR/pki; central role only).
+func PKIDir() string { return getenv("WAF_PKI_DIR", filepath.Join(ConfigDir(), "pki")) }
+
 // SecretsFile returns $WAF_CONFIG_DIR/secrets.env.
 func SecretsFile() string { return filepath.Join(ConfigDir(), "secrets.env") }
 

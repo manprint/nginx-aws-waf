@@ -230,3 +230,10 @@
   - Grafana anonymous access off (401 on API without auth), sign-up off, published only on 127.0.0.1:3000; Prometheus and apprise not published;
   - alerts deliver end to end (contact-point test and real spike) through apprise to the sink.
 - Residual: waf-ingest-lag fires for idle sites (documented; threshold per central.yaml).
+
+## 5.1 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW wafctl/internal/pki/{index,ca,issue,crl,token,pki_test}.go, cmd/wafctl/pki.go (`pki init|issue|revoke|list|crl|token`), tests/e2e/pki.sh (15 openssl-backed checks). WRITE main.go, env.go (`PKIDir`: $WAF_PKI_DIR, default $WAF_CONFIG_DIR/pki), .gitignore (`/lab/config/pki/`).
+- Contract as planned: ECDSA P-256; CA 10 y (IsCA, MaxPathLenZero, CertSign|CRLSign); leaves 90 d from now−5 min, DigitalSignature, client EKU ClientAuth + SAN DNS=cn, server EKU ServerAuth + SANs from flags; 128-bit random serials; CRL v2 via x509.CreateRevocationList, next_update +7 d, number +1 per generation; flock on index.json.lock for every write; private/ 0700, ca.key 0600 PKCS#8; tokens 32 random bytes base64url, only sha256 stored (tokens.json 0600), constant-time compare, single use, bound to cn, injected clock.
+- Shape decisions (non-weakening): index.json is `{"crl_number": n, "certs": [...]}` (the plan lists both an entry array and an index-level crl_number); `revoke <cn>` revokes every non-revoked cert of that CN; `SignCSR` (CSR signature, CN match, P-256 only) is added now for 5.3; `pkiAfterCRL` hook left for 5.2 (copy CRL to ingress + reload); CN restricted to `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`; token ttl ≤ 720h; leaf NotAfter capped at the CA's.
+- Self-review (security): crypto/rand only; file modes checked by tests and pki.sh; client cert rejected for ServerAuth (Go + openssl -purpose); CA key never printed or copied.
+- G-U51: TestPKI1_..TestPKI5_ PASS (5); openssl verify OK, CRL lists the revoked serial and `openssl verify -crl_check` → "certificate revoked" (pki.sh ALL PASS).
