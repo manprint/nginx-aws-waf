@@ -370,3 +370,17 @@
 - NEW scripts/aws-validate-acl.sh (create-web-acl or --ip-set): uses the local aws CLI 2.35.21, falling back to the docker image `amazon/aws-cli:2.35.21`, pinned to the same version (§6 pin). The fallback was tested with a PATH that has no aws: VALID.
 - Makefile: `aws-export-check` runs the T-EXP7 loop.
 - G-U62: TestEXP1–6 6 PASS. T-EXP7: all 12 lab sites VALID. The golden web_acls and the IP set are VALID too. A negative control without a complete VisibilityConfig → INVALID rc=252. The shop18 lossy list is `["client_ip.source=xff"]`. make test-unit: 15 ok.
+
+## 6.3 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW wafctl/internal/awsexport/hcl.go: a generic walker over web_acl. Attributes are sorted (name and priority first) and aligned the way terraform fmt aligns them; blocks follow, sorted.
+  - The IP set ARN becomes the expression `aws_wafv2_ip_set.<tf>.arn`.
+  - `${` is escaped to `$${` and `%{` to `%%{`.
+  - Also emits the terraform/provider/variable alb_arn/association blocks, plus comment lines for manual_steps (without the JSON-only IP set step) and lossy.
+- **Plan correction, mapping table (non-weakening):** `CloudWatchMetricsEnabled` → `cloudwatch_metrics_enabled` was added to the snake special cases. The plain split gives `cloud_watch_…`, which the provider does not know.
+- NEW hcl_test.go: TestTF1 (golden tunedaws.tf), TestTF2 (escaping) and TestTF3 (unquoted ARN expression).
+- NEW scripts/tf-validate-export.sh: runs init -backend=false, validate and fmt -check in a temp dir, on the TF_IMAGE pinned in the Makefile. Plugin cache in build/.tf-plugin-cache.
+- WRITE lab/config/sites/allowlist.yaml: custom rule OfficeAllow (start, allow, ip_set [203.0.113.200/32, 2001:db8::1/128]), as the plan's fixture asks.
+  - **BUG found and fixed (render):** libmodsecurity 3 rejects an IPv6 `/128` inside `@ipMatch` ("Rules error", nginx -t fails). `render/conds.go` `ipMatchList` now writes full-length prefixes as bare addresses.
+  - NEW TestR15_. New corpus cases allowlist-ipset-v4 and allowlist-ipset-v6 (OfficeAllow wins over IpReputation: first-wins).
+- G-U63: TestTF1–3 3 PASS. `tf-validate-export.sh build/aws/shop18.tf` → VALID; tuned.tf and allowlist.tf (IP sets v4+v6) → VALID. The rated, tunedaws, shadowed and methods fixtures → VALID.
+- Regression: corpus PASSED 67/67, make test-unit 0 FAIL, aws-export-check all VALID.

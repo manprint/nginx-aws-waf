@@ -110,6 +110,22 @@ cases:
   expect:
     status: 200
     terminating_rule: AllowPublic
+- id: allowlist-ipset-v4
+  site: allowlist
+  request:
+    path: /private/x
+    xff: 203.0.113.200
+  expect:
+    status: 200
+    terminating_rule: OfficeAllow
+- id: allowlist-ipset-v6
+  site: allowlist
+  request:
+    path: /private/x
+    xff: 2001:db8::1
+  expect:
+    status: 200
+    terminating_rule: OfficeAllow
 - id: allowlist-other
   site: allowlist
   request:

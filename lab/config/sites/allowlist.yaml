@@ -10,3 +10,7 @@ custom_rules:
     slot: start
     action: allow
     match: {all: [{uri_path: {starts_with: /public/}}]}
+  - name: OfficeAllow
+    slot: start
+    action: allow
+    match: {all: [{ip_set: [203.0.113.200/32, "2001:db8::1/128"]}]}

@@ -2,6 +2,7 @@ package render
 
 import (
 	"fmt"
+	"net/netip"
 	"strings"
 
 	"nginxawswaf/wafctl/internal/catalog"
@@ -57,7 +58,7 @@ func condLink(c config.Cond, cat *catalog.Catalog) (variable, op string, transfo
 	case "method":
 		return "REQUEST_METHOD", "@rx ^(?:" + strings.Join(c.Method, "|") + ")$", nil, nil
 	case "ip_set":
-		return "REMOTE_ADDR", "@ipMatch " + strings.Join(c.IPSet, ","), nil, nil
+		return "REMOTE_ADDR", "@ipMatch " + strings.Join(ipMatchList(c.IPSet), ","), nil, nil
 	case "geo":
 		return "TX:geo_cc", "@rx ^(?:" + strings.Join(c.Geo, "|") + ")$", nil, nil
 	case "size":
@@ -120,6 +121,19 @@ func condChain(prefix string, conds []config.Cond, final string) []string {
 			out = append(out, fmt.Sprintf(`SecRule &TX:%s_%d "@eq 0" "%s"`, prefix, i+1, acts))
 		} else {
 			out = append(out, fmt.Sprintf(`SecRule TX:%s_%d "@eq 1" "%s"`, prefix, i+1, acts))
+		}
+	}
+	return out
+}
+
+// ipMatchList writes full-length prefixes (/32, /128) as bare addresses: libmodsecurity 3
+// rejects an IPv6 /128 in @ipMatch ("Rules error"); other entries are kept as written.
+func ipMatchList(in []string) []string {
+	out := make([]string, len(in))
+	for i, s := range in {
+		out[i] = s
+		if p, err := netip.ParsePrefix(s); err == nil && p.Bits() == p.Addr().BitLen() {
+			out[i] = p.Addr().String()
 		}
 	}
 	return out

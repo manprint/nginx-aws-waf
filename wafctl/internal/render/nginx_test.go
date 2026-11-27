@@ -120,3 +120,10 @@ func TestR14_RateLimitLabSite(t *testing.T) {
 		t.Errorf("limit_req lines:\n%s", s)
 	}
 }
+
+func TestR15_IPMatchFullLengthPrefix(t *testing.T) {
+	got := strings.Join(ipMatchList([]string{"203.0.113.200/32", "2001:db8::1/128", "2001:db8::/32", "10.0.0.0/8", "192.0.2.1"}), ",")
+	if got != "203.0.113.200,2001:db8::1,2001:db8::/32,10.0.0.0/8,192.0.2.1" {
+		t.Errorf("ipMatchList = %s", got)
+	}
+}
