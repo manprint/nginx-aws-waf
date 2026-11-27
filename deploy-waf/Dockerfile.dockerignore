@@ -8,3 +8,4 @@ wafctl/bin/
 !data/ip-reputation/
 !deploy/vector/node.yaml
 !deploy-waf/bin/
+**/__pycache__

@@ -20,6 +20,7 @@ Odoo 14 dietro nginx, con il WAF davanti, e il monitoraggio completo: metriche (
 | http://localhost:3000 | Grafana, cartella **WAF** (5 dashboard), accesso diretto | `admin` / `admin` (anche anonimo, sola lettura) |
 | http://grafana.localhost | lo stesso Grafana, passando dal WAF | |
 | http://localhost | Odoo, perché è il sito di default del WAF | |
+| `localhost:8123` (HTTP), `localhost:9000` (nativo) | ClickHouse, log del WAF. Da browser: http://localhost:8123/play | `waf_ro` / `waf_ro` (lettura), `waf_admin` / `waf_admin` |
 
 I nomi `*.localhost` puntano già alla tua macchina, senza toccare `/etc/hosts`: valgono per
 Chrome, Firefox e curl.
@@ -57,7 +58,7 @@ docker compose up -d
 | `odoo-init` | `odoo:14` | crea il database `odoo` al primo avvio, poi esce | — |
 | `db` | `postgres:13` | database di Odoo | no |
 | `metrics` | `timberio/vector:0.62.0` | legge i log del WAF, scrive in ClickHouse e pubblica le metriche | no |
-| `clickhouse` | `clickhouse/clickhouse-server:26.8` | database dei log del WAF | no |
+| `clickhouse` | `clickhouse/clickhouse-server:26.8` | database dei log del WAF | **:8123**, **:9000** |
 | `prometheus` | `prom/prometheus:v3.16.0` | metriche (15 giorni) | no |
 | `grafana` | `grafana/grafana:13.2.7` | dashboard | **:3000** (diretto) e via :80 |
 | `init-dirs` | (WAF) | crea le cartelle in `data/` con i permessi giusti, poi esce | — |
@@ -89,6 +90,10 @@ entro 10 secondi.
 Nota su `localhost`: la regola AWS `Host_localhost_HEADER` blocca le richieste con
 `Host: localhost`. Solo in questo stack locale l'ho messa in count in `odoo.yaml`, altrimenti
 http://localhost darebbe 403. In produzione quell'override va tolto.
+
+**Rate limit**: in `odoo.yaml` c'è, commentato, un limite per IP come le rate-based rule di AWS
+(2000 richieste in 5 minuti). Il limite è per IP: dietro un NAT aziendale tutti gli utenti
+condividono lo stesso IP, quindi va dimensionato su quello.
 
 ### Provare il WAF
 
@@ -122,16 +127,82 @@ http://localhost:3000 (oppure http://grafana.localhost), cartella **WAF**:
 
 | Dashboard | Fonte | Cosa mostra |
 |---|---|---|
-| **WAF Overview** (home) | ClickHouse | richieste, bloccate, % per sito, top regole/IP/paesi/percorsi bloccati, latenze (paesi solo con [GeoIP](#geoip-paese-e-asn)) |
-| **WAF Rules & Tuning** | ClickHouse | per ogni regola: match, quante bloccano, quante in count; regole che bloccherebbero se attivate. Serve per decidere cosa passare in enforce |
+| **WAF Richieste** (home) | ClickHouse | ogni richiesta: esito e, se bloccata, regola e causa in italiano. Dettaglio completo di una richiesta ([sotto](#la-dashboard-waf-richieste)) |
+| **WAF Traffic overview** | ClickHouse | come la *Traffic overview* della console AWS: frasi di sintesi, azioni con confronto sul periodo precedente, attacchi per tipo, mappa e classifiche (IP, paesi, ASN, URI, host, user-agent, referrer, metodi), label, login Odoo, rate limit, alert ([sotto](#la-dashboard-waf-traffic-overview)) |
+| **WAF Overview** | ClickHouse | richieste, bloccate, % per sito, top regole/IP/paesi/percorsi bloccati, latenze (paesi solo con [GeoIP](#geoip-paese-e-asn)) |
+| **WAF Rules & Tuning** | ClickHouse | regole configurate per sito (come la pagina *Rules* della Web ACL) con override, WCU usati, impostazioni; andamento di ogni regola nel tempo (bloccate / in count / senza effetto) e dove matcha; regole in count che bloccherebbero. Serve per decidere cosa passare in enforce |
 | **WAF Request Explorer** | ClickHouse | ricerca delle singole richieste per sito, IP, regola, esito, request id; dettaglio con header, body e regole matchate |
 | **WAF Metrics (Prometheus)** | Prometheus | traffico in tempo reale (aggiornamento 10 s), blocchi per regola, codici HTTP, latenze p50/p95/p99, CPU e memoria |
 | **WAF Nodes Health** | Prometheus + ClickHouse | salute di nodo, nginx, Vector e ClickHouse; versione di config attiva |
 
+### La dashboard "WAF Richieste"
+
+È la pagina iniziale di Grafana. Dall'alto:
+
+1. **Riepilogo**: richieste totali, bloccate, percentuale, richieste "in count" (le avrebbe
+   bloccate una regola configurata per solo log), IP distinti e IP bloccati.
+2. **Richieste nel tempo** (consentite/bloccate) e **Perché vengono bloccate** (torta per tipo di
+   attacco).
+3. **Tabella delle richieste**, una riga per richiesta: ora, sito, IP, paese, metodo, URL, stato
+   HTTP, esito (✅ consentita / ⛔ BLOCCATA), **regola** che ha bloccato e **causa**. La causa dice
+   tipo di attacco, dove è stato trovato e valore sospetto, ad esempio
+   `Cross-Site Scripting (XSS) — parametro URL «q»: <script>alert(1)</script>`.
+   La colonna *Regole in count* mostra le regole che hanno trovato qualcosa senza bloccare.
+   Ogni colonna ha un filtro (icona a imbuto). Clic su un **IP**: filtra quell'IP. Clic su un
+   **request_id**: apre il dettaglio.
+4. **Blocchi raggruppati**: per regola, causa e punto della richiesta, con numero di richieste,
+   IP, un esempio di URL e di valore.
+5. **Dettaglio della richiesta** (request_id selezionato): tutti i campi, tutte le regole che
+   hanno matchato (quella *decisiva* in rosso, quelle in count in giallo), header, body e le altre
+   richieste dello stesso IP.
+
+Filtri in alto: **Sito**, **Esito** (Bloccate, Consentite, In count, Errore WAF), **IP**,
+**Cerca** (testo in URL, host o nome della regola) e **request_id**.
+
+Le cause in italiano vengono dalle funzioni ClickHouse `waf_causa`, `waf_dove` e `waf_spiega`
+(`clickhouse/initdb/003-functions.sql`). Si possono usare anche in SQL.
+
+### La dashboard "WAF Traffic overview"
+
+Ricalca la *Traffic overview* della console AWS WAF. Sezioni:
+
+| Sezione | Contenuto |
+|---|---|
+| **In sintesi** | frasi automatiche: totale e variazione rispetto al periodo precedente, causa principale dei blocchi, IP più bloccato, regola in count che bloccherebbe di più, login falliti e possibile brute force, rate limit, picco, paese principale |
+| Azioni | richieste, consentite, bloccate, in count, rate limit, FAIL (come le metriche CloudWatch `AllowedRequests`, `BlockedRequests`, `CountedRequests`) e la variazione percentuale rispetto al periodo precedente di pari durata |
+| **Andamento** | richieste per azione e attacchi bloccati per tipo nel tempo |
+| **Da dove arrivano** | mappa dei paesi (colore = % bloccate), top paesi, top ASN, top IP (clic → tutte le richieste dell'IP), top user-agent |
+| **Cosa chiedono** | top URI, host, referrer e metodi HTTP |
+| **Regole e label** | regole che hanno deciso più blocchi e label `awswaf:...` più frequenti |
+| **Login Odoo** | equivalente semplificato di AWS ATP (account takeover): tentativi, riusciti (303), falliti (200), bloccati; per IP: utenti provati, *possibile brute force*, *accesso dopo molti fallimenti* |
+| **Rate limit** | limite configurato per sito, richieste respinte nel tempo, IP limitati (come `GetRateBasedStatementManagedKeys`) |
+| **Alert** | stato degli alert del WAF |
+
+Paesi, ASN e mappa richiedono [GeoIP](#geoip-paese-e-asn).
+
+### Alert
+
+In Grafana ▸ Alerting ▸ Alert rules, cartella **WAF**. Le regole sono in
+`grafana/provisioning/alerting/waf-alerts.yaml`, dove si cambiano soglie e testi.
+
+| Alert | Quando scatta |
+|---|---|
+| WAF non risponde | `nginx_up` = 0 per 1 minuto (critical) |
+| Log del WAF fermi | nessun heartbeat in ClickHouse da 3 minuti |
+| Picco di richieste bloccate | più di 30 bloccate al minuto per 2 minuti |
+| Troppi errori 5xx | più del 5% di risposte 5xx per 5 minuti |
+| Login Odoo: troppi tentativi falliti | più di 10 login falliti da un IP in 5 minuti |
+| Rate limit attivo | un IP è stato respinto dal rate limit (info) |
+| Errori interni del WAF | richieste con esito FAIL |
+
+Per ricevere le notifiche serve un *contact point*: Grafana ▸ Alerting ▸ Contact points, oppure
+modifica il contact point di default (email, Telegram, Slack, webhook...). Senza contact point gli
+alert si vedono comunque in Grafana e nella dashboard.
+
 ### Trovare un falso positivo
 
-1. Grafana ▸ **WAF Request Explorer**, filtro `action = BLOCK`.
-2. Apri la richiesta: vedi quale regola l'ha bloccata (`terminating_rule`), il percorso e il body.
+1. Grafana ▸ **WAF Richieste**, filtro *Esito* = Bloccate.
+2. Clic sul request_id: vedi quale regola l'ha bloccata, dove ha trovato cosa, il percorso e il body.
 3. Mettila in count solo su quel percorso, in `config/sites/odoo.yaml`:
    ```yaml
    path_overrides:
@@ -148,6 +219,7 @@ Tabelle nel database `waf`:
 | `events` | richiesta | `ts`, `site_id`, `client_ip`, `method`, `path`, `query`, `status`, `action` (ALLOW/BLOCK), `shadow_action`, `terminating_rule`, `labels`, `request_headers`, `request_body`, `request_time`, `upstream_time`, `user_class` (Odoo: `backend`, `website`, `other`) |
 | `matches` | regola matchata | `request_id`, `rule_group`, `rule_name`, `configured_action`, `request_action` |
 | `heartbeats` | 30 secondi | nodo, versione, revisione di config attiva |
+| `site_rules` | regola, per ogni reload | configurazione attiva di ogni sito: gruppi con WCU, regole con azione di default ed effettiva e origine dell'override, regole custom, impostazioni. La vista `site_rules_current` contiene solo l'ultima. La scrive il WAF a ogni cambio di config (`waf publish` per forzarla) |
 
 Più gli aggregati al minuto (`agg_requests_1m`, `agg_matches_1m`) usati dalle dashboard.
 Conservazione (TTL in `clickhouse/initdb/001-schema.sql`): 30 giorni per `events`, `matches` e
@@ -155,6 +227,30 @@ Conservazione (TTL in `clickhouse/initdb/001-schema.sql`): 30 giorni per `events
 
 Paese e ASN (`country`, `asn`, `as_org`) sono vuoti finché non scarichi i database GeoIP
 ([sotto](#geoip-paese-e-asn)).
+
+### Dati sensibili: redazione
+
+Come i *redacted fields* di AWS WAF, prima di salvare un evento Vector (`vector/node.yaml`)
+maschera con `[REDACTED]`:
+
+- **Campi**: valori dei parametri e dei campi JSON o multipart con nomi come `password`, `pwd`,
+  `token`, `csrf_token`, `secret`, `api_key`, `session_id`, `otp`. Valgono per URL, query, body e
+  valori delle regole matchate.
+- **Header**: `Authorization`, `X-Openerp-Session-Id`, `X-Api-Key` e simili.
+- **Cookie** e **Set-Cookie**: restano visibili i nomi, i valori sono mascherati.
+
+In ClickHouse, Grafana e `data/raw` non finiscono quindi password né sessioni di Odoo. Il nome
+utente del login resta visibile, serve alla sezione *Login Odoo*.
+
+Fa eccezione `logs/audit.log`, il log grezzo di ModSecurity da cui legge Vector: contiene le
+richieste complete e non va condiviso. Viene ruotato quando supera `WAF_LOG_MAX_SIZE_MB` (default
+512 MB) e le copie ruotate vengono cancellate dopo `WAF_LOG_KEEP_HOURS` (default 24 ore).
+
+Un'installazione creata prima della redazione può contenere dati in chiaro. Per mascherarli:
+
+```sh
+docker compose exec -T clickhouse clickhouse-client -u waf_admin --password waf_admin --multiquery < clickhouse/redact-existing.sql
+```
 
 ### Da riga di comando: `wafctl`
 
@@ -170,9 +266,20 @@ docker compose exec waf wafctl logs export --since 1h --format aws -o /var/log/w
 
 ### SQL diretto
 
+ClickHouse è esposto sulla macchina:
+
+- **Browser**: http://localhost:8123/play, con utente `waf_ro` e password `waf_ro`.
+- **DBeaver / DataGrip**: driver ClickHouse, host `localhost`, porta `8123`, database `waf`.
+- **clickhouse-client**: `clickhouse-client --host localhost --port 9000 -u waf_ro --password waf_ro`.
+- **HTTP/curl**: `curl 'http://localhost:8123/?user=waf_ro&password=waf_ro' --data-binary 'SELECT count() FROM waf.events'`.
+- **Dal container**, senza installare nulla:
+
 ```sh
 docker compose exec clickhouse clickhouse-client -u waf_admin --password waf_admin
 ```
+
+Le porte si cambiano con `CH_HTTP_PORT` e `CH_TCP_PORT` nel `.env`. Fuori dal locale cambia le
+password o togli le porte.
 
 ```sql
 -- esiti per sito nell'ultima ora
@@ -184,6 +291,13 @@ WHERE action = 'BLOCK' AND ts > today() GROUP BY 1 ORDER BY c DESC LIMIT 10;
 
 -- IP più bloccati
 SELECT client_ip, count() c FROM waf.events WHERE action = 'BLOCK' GROUP BY 1 ORDER BY c DESC LIMIT 10;
+
+-- ogni richiesta bloccata con la causa in italiano
+SELECT e.ts, e.client_ip, e.path, e.terminating_rule,
+       waf_spiega(m.rule_name, e.terminating_type, m.variable, m.value) AS causa
+FROM waf.events e
+LEFT JOIN waf.matches m ON m.request_id = e.request_id AND m.rule_id = e.terminating_rule_id
+WHERE e.action = 'BLOCK' ORDER BY e.ts DESC LIMIT 20;
 
 -- regole in count che hanno matchato su traffico Odoo (candidati falsi positivi)
 SELECT rule_name, path, count() c FROM waf.matches
@@ -289,6 +403,7 @@ docker compose exec prometheus wget -qO- 'http://localhost:9090/api/v1/query?que
 ```sh
 docker compose logs -f waf                 # reload della config, errori
 docker compose exec waf waf status         # versione di config attiva, siti, liste IP
+docker compose exec waf waf publish        # ripubblica in ClickHouse le regole attive (pannelli Regole/WCU)
 docker compose exec waf waf explain odoo   # tutte le regole del sito e la loro azione effettiva
 docker compose exec waf waf bypass odoo --ttl 30m --reason "test"   # sito in sola registrazione per 30 min
 docker compose exec waf waf bypass clear odoo
@@ -312,6 +427,8 @@ Metti i moduli in `addons/`, poi `docker compose up -d odoo` e installali da Odo
 | Sintomo | Soluzione |
 |---|---|
 | `port is already allocated` su 3000 | `GRAFANA_PORT=3001` nel `.env` |
+| `port is already allocated` su 8123 o 9000 | `CH_HTTP_PORT` / `CH_TCP_PORT` nel `.env` |
+| Colonna "Causa" vuota o pannelli Regole/WCU vuoti con uno stack creato in precedenza | gli script di `clickhouse/initdb/` girano solo al primo avvio. Esegui quelli nuovi: `for f in clickhouse/initdb/00[34]-*.sql; do docker compose exec -T clickhouse clickhouse-client -u waf_admin --password waf_admin --multiquery < $f; done`, poi `docker compose exec waf waf publish` |
 | `port is already allocated` su 80 | un altro servizio usa la porta 80: fermalo, oppure `HTTP_PORT=8080` nel `.env` e usa http://odoo.localhost:8080 |
 | http://odoo.localhost non si apre | usa Chrome/Firefox oppure http://localhost; alcuni sistemi non risolvono `*.localhost`: aggiungi `127.0.0.1 odoo.localhost grafana.localhost` a `/etc/hosts` |
 | 502 su Odoo subito dopo l'avvio | Odoo sta ancora partendo, attendi 10-20 secondi |

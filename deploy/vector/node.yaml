@@ -82,7 +82,9 @@ transforms:
       ev.scheme = string(a.scheme) ?? ""
       ev.http_version = string(a.proto) ?? ""
       ev.tls_protocol = string(a.ssl) ?? ""
-      ev.uri = string(a.uri) ?? ""
+      # Redazione dei dati sensibili (come i "redacted fields" di AWS WAF): password, token, chiavi
+      # e sessioni non arrivano mai in chiaro nei log, in ClickHouse o in Grafana.
+      ev.uri = replace(string(a.uri) ?? "", r'(?i)([?&](?:password|passwd|pwd|new_password|confirm_password|old_pwd|new_pwd|password_confirmation|secret|client_secret|token|access_token|refresh_token|id_token|api_key|apikey|csrf_token|session_id|totp_token|otp)=)[^&]*', "$${1}[REDACTED]")
       parts = split(ev.uri, "?", limit: 2)
       ev.path = string(parts[0]) ?? ""
       ev.query = string(parts[1]) ?? ""
@@ -143,6 +145,14 @@ transforms:
           if tb != 0 && tb != base { post_t = 1 }
           aws_post_t = 0
           if ab != 0 && ab != base { aws_post_t = 1 }
+          mvar = string(ld.v) ?? ""
+          xval = truncate(string(ld.x) ?? "", 1024)
+          if match(mvar, r'(?i)(^|:)(password|passwd|pwd|new_password|confirm_password|old_pwd|new_pwd|password_confirmation|secret|client_secret|token|access_token|refresh_token|id_token|api_key|apikey|csrf_token|session_id|totp_token|otp)$') || match(mvar, r'(?i)^REQUEST_(HEADERS|COOKIES):(cookie|set-cookie|authorization|proxy-authorization|x-openerp-session-id|x-api-key|x-auth-token|x-csrf-token|x-csrftoken|password|passwd|pwd|new_password|confirm_password|old_pwd|new_pwd|password_confirmation|secret|client_secret|token|access_token|refresh_token|id_token|api_key|apikey|csrf_token|session_id|totp_token|otp)$') {
+            xval = "[REDACTED]"
+          } else {
+            xval = replace(xval, r'(?i)((?:^|[&?])(?:password|passwd|pwd|new_password|confirm_password|old_pwd|new_pwd|password_confirmation|secret|client_secret|token|access_token|refresh_token|id_token|api_key|apikey|csrf_token|session_id|totp_token|otp)=)[^&]*', "$${1}[REDACTED]")
+            xval = replace(xval, r'(?i)("(?:password|passwd|pwd|new_password|confirm_password|old_pwd|new_pwd|password_confirmation|secret|client_secret|token|access_token|refresh_token|id_token|api_key|apikey|csrf_token|session_id|totp_token|otp)"\s*:\s*)"(?:[^"\\]|\\.)*"', "$${1}\"[REDACTED]\"")
+          }
           rows = push(rows, {
             "rule_id": base,
             "rule_group": string(rp[0]) ?? "",
@@ -153,7 +163,7 @@ transforms:
             "post_terminating": post_t,
             "aws_post_terminating": aws_post_t,
             "variable": string(ld.v) ?? "",
-            "value": truncate(string(ld.x) ?? "", 1024)
+            "value": xval
           })
         }
       }
@@ -191,9 +201,27 @@ transforms:
       ev.match_count = length(rows)
       req = object(t.request) ?? {}
       res = object(t.response) ?? {}
-      ev.request_headers = object(req.headers) ?? {}
-      ev.response_headers = object(res.headers) ?? {}
-      ev.request_body = string(req.body) ?? ""
+      rqh = {}
+      for_each(object(req.headers) ?? {}) -> |hk, hv| {
+        v = string(hv) ?? ""
+        if match(hk, r'(?i)^(cookie|set-cookie)$') { v = replace(v, r'=[^;]*', "=[REDACTED]") }
+        else if match(hk, r'(?i)^(cookie|set-cookie|authorization|proxy-authorization|x-openerp-session-id|x-api-key|x-auth-token|x-csrf-token|x-csrftoken)$') { v = "[REDACTED]" }
+        rqh = set!(rqh, [hk], v)
+      }
+      ev.request_headers = rqh
+      rsh = {}
+      for_each(object(res.headers) ?? {}) -> |hk, hv| {
+        v = string(hv) ?? ""
+        if match(hk, r'(?i)^(cookie|set-cookie)$') { v = replace(v, r'^([^=]*)=[^;]*', "$${1}=[REDACTED]") }
+        else if match(hk, r'(?i)^(cookie|set-cookie|authorization|proxy-authorization|x-openerp-session-id|x-api-key|x-auth-token|x-csrf-token|x-csrftoken)$') { v = "[REDACTED]" }
+        rsh = set!(rsh, [hk], v)
+      }
+      ev.response_headers = rsh
+      body = string(req.body) ?? ""
+      body = replace(body, r'(?i)((?:^|&)(?:password|passwd|pwd|new_password|confirm_password|old_pwd|new_pwd|password_confirmation|secret|client_secret|token|access_token|refresh_token|id_token|api_key|apikey|csrf_token|session_id|totp_token|otp)=)[^&]*', "$${1}[REDACTED]")
+      body = replace(body, r'(?i)("(?:password|passwd|pwd|new_password|confirm_password|old_pwd|new_pwd|password_confirmation|secret|client_secret|token|access_token|refresh_token|id_token|api_key|apikey|csrf_token|session_id|totp_token|otp)"\s*:\s*)"(?:[^"\\]|\\.)*"', "$${1}\"[REDACTED]\"")
+      body = replace(body, r'(?is)(name="(?:password|passwd|pwd|new_password|confirm_password|old_pwd|new_pwd|password_confirmation|secret|client_secret|token|access_token|refresh_token|id_token|api_key|apikey|csrf_token|session_id|totp_token|otp)"\r?\n\r?\n)[^\r\n]*', "$${1}[REDACTED]")
+      ev.request_body = body
       ev._rows = rows
       . = ev
 

@@ -308,6 +308,11 @@ nginx.
 I log vengono ruotati oltre `WAF_LOG_MAX_SIZE_MB`, compressi con gzip e cancellati dopo
 `WAF_LOG_KEEP_HOURS`. Gli eventi JSONL vengono cancellati dopo `WAF_RAW_DAYS` giorni.
 
+**Dati sensibili.** Negli eventi elaborati (`data/raw`, ClickHouse) password, token, `csrf_token`,
+`session_id`, chiavi API, `Authorization` e valori dei cookie diventano `[REDACTED]`, come i
+*redacted fields* di AWS WAF (`vector/node.yaml`). `logs/audit.log` invece è il log grezzo di
+ModSecurity e contiene le richieste complete: non condividerlo.
+
 ## 9. Metriche Prometheus
 
 Endpoint: `http://<host>:9598/metrics`

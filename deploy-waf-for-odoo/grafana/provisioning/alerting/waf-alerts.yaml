@@ -1,0 +1,306 @@
+# Alert del WAF (Grafana ▸ Alerting ▸ Alert rules, cartella WAF). Soglie e testi si modificano direttamente qui.
+# Le notifiche vanno al contact point di default di Grafana: per riceverle (email, Telegram, Slack, webhook)
+# configura un contact point in Grafana ▸ Alerting ▸ Contact points oppure in contact-points.yaml.
+apiVersion: 1
+groups:
+- orgId: 1
+  name: waf
+  folder: WAF
+  interval: 1m
+  rules:
+  - uid: waf-down
+    title: WAF non risponde
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prom
+      model:
+        refId: A
+        expr: min(nginx_up) or vector(0)
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: C
+      datasourceUid: __expr__
+      relativeTimeRange:
+        from: 0
+        to: 0
+      model:
+        refId: C
+        type: threshold
+        expression: A
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 1
+    for: 1m
+    noDataState: Alerting
+    execErrState: Error
+    isPaused: false
+    annotations:
+      summary: 'Il WAF (nginx) non risponde: il sito è irraggiungibile'
+      description: 'nginx_up = 0 da almeno 1 minuto. Controlla: docker compose ps waf; docker compose logs waf'
+      dashboard: /d/waf-nodes
+    labels:
+      severity: critical
+      team: waf
+  - uid: waf-logs-stalled
+    title: Log del WAF fermi (nessun heartbeat in ClickHouse)
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: ch
+      model:
+        refId: A
+        editorType: sql
+        queryType: table
+        format: 1
+        rawSql: SELECT dateDiff('second', max(ts), now()) AS secondi FROM waf.heartbeats WHERE ts > now() - INTERVAL 1 DAY
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: ch
+    - refId: C
+      datasourceUid: __expr__
+      relativeTimeRange:
+        from: 0
+        to: 0
+      model:
+        refId: C
+        type: threshold
+        expression: A
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 180
+    for: 2m
+    noDataState: Alerting
+    execErrState: Error
+    isPaused: false
+    annotations:
+      summary: Da {{ $values.A }} secondi non arrivano heartbeat in ClickHouse
+      description: 'La pipeline WAF → Vector (servizio metrics) → ClickHouse è ferma. Controlla: docker compose logs metrics clickhouse'
+      dashboard: /d/waf-nodes
+    labels:
+      severity: warning
+      team: waf
+  - uid: waf-blocked-spike
+    title: Picco di richieste bloccate
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prom
+      model:
+        refId: A
+        expr: sum(rate(waf_blocked_requests_total[5m])) * 60 or vector(0)
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: C
+      datasourceUid: __expr__
+      relativeTimeRange:
+        from: 0
+        to: 0
+      model:
+        refId: C
+        type: threshold
+        expression: A
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 30
+    for: 2m
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
+    annotations:
+      summary: '{{ humanize $values.A }} richieste bloccate al minuto (soglia 30)'
+      description: Possibile attacco o falso positivo su larga scala. Grafana ▸ WAF Richieste, filtro Esito = Bloccate.
+      dashboard: /d/waf-traffic
+    labels:
+      severity: warning
+      team: waf
+  - uid: waf-5xx
+    title: Troppi errori 5xx
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prom
+      model:
+        refId: A
+        expr: ((sum(rate(waf_requests_total{status=~"5.."}[5m])) or vector(0)) / clamp_min(sum(rate(waf_requests_total[5m])), 0.001)) or vector(0)
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: C
+      datasourceUid: __expr__
+      relativeTimeRange:
+        from: 0
+        to: 0
+      model:
+        refId: C
+        type: threshold
+        expression: A
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0.05
+    for: 5m
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
+    annotations:
+      summary: '{{ humanize $values.A }} delle risposte sono errori 5xx (soglia 5%)'
+      description: 'Il backend (Odoo/nginx) è in errore o sovraccarico. Controlla: docker compose logs odoo nginx'
+      dashboard: /d/waf-metrics
+    labels:
+      severity: warning
+      team: waf
+  - uid: waf-login-bruteforce
+    title: 'Login Odoo: troppi tentativi falliti da un IP'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: ch
+      model:
+        refId: A
+        editorType: sql
+        queryType: table
+        format: 1
+        rawSql: SELECT client_ip, count() AS falliti FROM waf.events WHERE ts > now() - INTERVAL 5 MINUTE AND method = 'POST' AND path = '/web/login' AND status = 200 GROUP BY client_ip HAVING falliti >
+          0
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: ch
+    - refId: C
+      datasourceUid: __expr__
+      relativeTimeRange:
+        from: 0
+        to: 0
+      model:
+        refId: C
+        type: threshold
+        expression: A
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 10
+    for: 0s
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
+    annotations:
+      summary: '{{ $labels.client_ip }}: {{ $values.A }} login falliti in 5 minuti'
+      description: Possibile brute force sulle password di Odoo. Valuta un blocco IP (config/lists) o il rate_limit del sito.
+      dashboard: /d/waf-traffic
+    labels:
+      severity: warning
+      team: waf
+  - uid: waf-ratelimit
+    title: Rate limit attivo
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: ch
+      model:
+        refId: A
+        editorType: sql
+        queryType: table
+        format: 1
+        rawSql: SELECT client_ip, count() AS respinte FROM waf.events WHERE ts > now() - INTERVAL 5 MINUTE AND terminating_type = 'RATE_BASED' GROUP BY client_ip
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: ch
+    - refId: C
+      datasourceUid: __expr__
+      relativeTimeRange:
+        from: 0
+        to: 0
+      model:
+        refId: C
+        type: threshold
+        expression: A
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0
+    for: 0s
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
+    annotations:
+      summary: '{{ $labels.client_ip }}: {{ $values.A }} richieste respinte dal rate limit negli ultimi 5 minuti'
+      description: Un IP ha superato il rate_limit del sito.
+      dashboard: /d/waf-traffic
+    labels:
+      severity: info
+      team: waf
+  - uid: waf-fail
+    title: Errori interni del WAF (FAIL)
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: ch
+      model:
+        refId: A
+        editorType: sql
+        queryType: table
+        format: 1
+        rawSql: SELECT count() AS fail FROM waf.events WHERE ts > now() - INTERVAL 5 MINUTE AND action = 'FAIL'
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: ch
+    - refId: C
+      datasourceUid: __expr__
+      relativeTimeRange:
+        from: 0
+        to: 0
+      model:
+        refId: C
+        type: threshold
+        expression: A
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0
+    for: 0s
+    noDataState: OK
+    execErrState: Error
+    isPaused: false
+    annotations:
+      summary: '{{ $values.A }} richieste con esito FAIL negli ultimi 5 minuti'
+      description: Il motore WAF non è riuscito a valutare alcune richieste (body troppo grande, limite PCRE). Vedi fail_reason in WAF Richieste.
+      dashboard: /d/waf-traffic
+    labels:
+      severity: warning
+      team: waf

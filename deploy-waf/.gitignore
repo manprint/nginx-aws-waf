@@ -10,3 +10,4 @@ config/sites/*
 config/node.yaml
 config/secrets.env
 config/lists/*.txt
+__pycache__/

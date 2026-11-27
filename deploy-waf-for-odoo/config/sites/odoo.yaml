@@ -15,3 +15,6 @@ rule_groups:
   - name: AWSManagedRulesKnownBadInputsRuleSet
     rule_action_overrides: {Host_localhost_HEADER: count}
 # mode: count                   # decommenta per osservare senza bloccare
+# Rate limit per IP (come una rate-based rule AWS): oltre 2000 richieste in 5 minuti → 403.
+# Visibile in Grafana ▸ WAF Traffic overview ▸ Rate limit.
+# rate_limit: {limit: 2000, window_sec: 300, action: block}

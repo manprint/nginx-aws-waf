@@ -10,6 +10,7 @@
 #   waf lists-update  scarica le liste IP (protezione 50 %), reload se cambiate
 #   waf rotate        ruota access/error/audit log, pulisce log e raw vecchi
 #   waf status        rev attiva, siti, stato nginx
+#   waf publish       pubblica in ClickHouse le regole attive di ogni sito (automatico dopo ogni reload)
 #   waf wafctl ...    qualsiasi comando wafctl con l'ambiente del container
 set -euo pipefail
 
@@ -161,6 +162,7 @@ do_reload() {
 			echo "$lsum" >"$STATE/lists.sum"
 			log "liste IP cambiate: nginx ricaricato"
 		fi
+		publish
 		return 0
 	fi
 	if ! nginx -t -q -c "$new/nginx/nginx.conf"; then
@@ -170,7 +172,11 @@ do_reload() {
 	switch_to "$rev"
 	echo "$lsum" >"$STATE/lists.sum"
 	prune
+	publish
 }
+
+# config attiva → ClickHouse (waf.site_rules), in background; no-op senza WAF_CH_INGEST_PASSWORD o se già pubblicata
+publish() { [[ -n ${WAF_CH_INGEST_PASSWORD:-} ]] && { waf-publish "$@" || true; } 9>&- & return 0; }
 
 do_rotate() {
 	local max=$((${WAF_LOG_MAX_SIZE_MB:-512} * 1024 * 1024)) ts reopen=0 audit=0 f slot
@@ -232,6 +238,7 @@ rollback)
 	exec 9>"$LOCK"; flock 9
 	nginx -t -q -c "$RT/$1/nginx/nginx.conf" || die "nginx -t fallito su $1"
 	switch_to "$1"
+	publish
 	;;
 bypass)
 	case "${1:-}" in
@@ -246,6 +253,7 @@ bypass)
 lists-update) exec 9>"$LOCK"; flock 9; do_lists_update "$@" ;;
 rotate) exec 9>"$LOCK"; flock 9; do_rotate ;;
 status) do_status ;;
+publish) exec waf-publish --force ;;
 wafctl) exec wafctl "$@" ;;
 _init) seed; build_config; do_reload -f ;; # usato dall'entrypoint (nginx non ancora avviato)
 help | -h | --help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;

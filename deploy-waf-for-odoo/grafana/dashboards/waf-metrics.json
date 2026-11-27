@@ -1310,5 +1310,15 @@
  ],
  "annotations": {
   "list": []
- }
+ },
+ "links": [
+  {
+   "type": "dashboards",
+   "tags": [
+    "waf"
+   ],
+   "asDropdown": true,
+   "title": "Altre dashboard WAF"
+  }
+ ]
 }

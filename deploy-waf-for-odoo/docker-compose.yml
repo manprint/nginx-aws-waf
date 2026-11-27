@@ -8,6 +8,7 @@
 #
 #   http://odoo.localhost      Odoo 14    (admin / admin)
 #   http://localhost:3000      Grafana    (admin / admin), cartella "WAF"  (anche http://grafana.localhost, via WAF)
+#   localhost:8123 / :9000     ClickHouse (waf_admin / waf_admin, sola lettura: waf_ro / waf_ro)
 #
 #   docker compose up -d        (primo avvio: 1-3 minuti)
 #
@@ -56,6 +57,8 @@ services:
       WAF_CH_URL: http://clickhouse:8123
       WAF_CH_USER: waf_ro
       WAF_CH_PASSWORD: ${WAF_CH_RO_PASSWORD:-waf_ro}
+      # pubblica le regole attive di ogni sito in waf.site_rules a ogni reload (pannelli Regole/WCU)
+      WAF_CH_INGEST_PASSWORD: ${WAF_CH_INGEST_PASSWORD:-waf_ingest}
     volumes:
       - ./config:/config:ro
       - ./logs:/var/log/waf
@@ -187,7 +190,7 @@ services:
 
   # ============================================================ LOG (ClickHouse)
   # Database dei log del WAF: una riga per richiesta (waf.events) e per regola matchata (waf.matches).
-  # Schema e utenti creati al primo avvio da clickhouse/initdb/. Non esposto: lo usano Grafana e wafctl.
+  # Schema, utenti e funzioni creati al primo avvio da clickhouse/initdb/. Porte 8123 (HTTP) e 9000 (nativo).
   clickhouse:
     image: clickhouse/clickhouse-server:26.8-alpine
     restart: unless-stopped
@@ -200,6 +203,9 @@ services:
       - ./data/clickhouse:/var/lib/clickhouse
       - ./clickhouse/initdb:/docker-entrypoint-initdb.d:ro
       - ./clickhouse/config.d/waf.xml:/etc/clickhouse-server/config.d/waf.xml:ro
+    ports:
+      - "${CH_HTTP_PORT:-8123}:8123"    # HTTP: http://localhost:8123/play, DBeaver, Grafana esterno
+      - "${CH_TCP_PORT:-9000}:9000"     # nativo: clickhouse-client --host localhost --port 9000
     ulimits:
       nofile: {soft: 262144, hard: 262144}
     healthcheck:
@@ -231,7 +237,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_AUTH_ANONYMOUS_ENABLED: "true"         # in locale si vede la dashboard anche senza login
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/waf-overview.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/waf-requests.json
       GF_PLUGINS_PREINSTALL_SYNC: grafana-clickhouse-datasource@4.24.0   # datasource ClickHouse (scaricato al primo avvio)
       WAF_CH_RO_PASSWORD: ${WAF_CH_RO_PASSWORD:-waf_ro}                    # usata in provisioning/datasources
       GF_ANALYTICS_REPORTING_ENABLED: "false"

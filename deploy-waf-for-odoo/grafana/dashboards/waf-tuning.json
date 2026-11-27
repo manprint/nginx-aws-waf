@@ -1,231 +1,889 @@
 {
-  "uid": "waf-tuning",
-  "title": "WAF Rules & Tuning",
-  "schemaVersion": 39,
-  "version": 1,
-  "editable": false,
-  "tags": [
-    "waf"
-  ],
-  "timezone": "utc",
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
-  "refresh": "30s",
-  "templating": {
-    "list": [
-      {
-        "name": "site",
-        "label": "Sito",
-        "hide": 0,
-        "type": "query",
-        "datasource": {
-          "type": "grafana-clickhouse-datasource",
-          "uid": "ch"
-        },
-        "definition": "SELECT DISTINCT site_id FROM waf.agg_requests_1m WHERE minute > now() - INTERVAL 30 DAY ORDER BY site_id",
-        "query": "SELECT DISTINCT site_id FROM waf.agg_requests_1m WHERE minute > now() - INTERVAL 30 DAY ORDER BY site_id",
-        "multi": true,
-        "includeAll": true,
-        "allValue": "'__all__'",
-        "refresh": 2,
-        "sort": 1,
-        "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        }
-      }
-    ]
-  },
-  "panels": [
-    {
-      "id": 1,
-      "type": "table",
-      "title": "Regole in COUNT per sito (candidati would-block)",
-      "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 24,
-        "h": 10
-      },
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "ch"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "ch"
-          },
-          "editorType": "sql",
-          "queryType": "table",
-          "format": 1,
-          "rawSql": "SELECT site_id, rule_group, rule_name, sum(matches) AS matches FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND configured_action = 'COUNT' GROUP BY site_id, rule_group, rule_name ORDER BY matches DESC LIMIT 100",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true
-      }
+ "uid": "waf-tuning",
+ "title": "WAF Rules & Tuning",
+ "schemaVersion": 39,
+ "version": 1,
+ "editable": false,
+ "tags": [
+  "waf"
+ ],
+ "timezone": "utc",
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "refresh": "30s",
+ "templating": {
+  "list": [
+   {
+    "name": "site",
+    "label": "Sito",
+    "hide": 0,
+    "type": "query",
+    "datasource": {
+     "type": "grafana-clickhouse-datasource",
+     "uid": "ch"
     },
-    {
-      "id": 2,
-      "type": "timeseries",
-      "title": "Match per regola (top 10)",
-      "gridPos": {
-        "x": 0,
-        "y": 10,
-        "w": 24,
-        "h": 9
-      },
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "ch"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "ch"
-          },
-          "editorType": "sql",
-          "queryType": "timeseries",
-          "format": 0,
-          "rawSql": "SELECT $__timeInterval(minute) AS time, rule_name, sum(matches) AS matches FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND rule_name IN (SELECT rule_name FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) GROUP BY rule_name ORDER BY sum(matches) DESC LIMIT 10) GROUP BY time, rule_name ORDER BY time",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "fillOpacity": 10,
-            "drawStyle": "line"
-          }
-        },
-        "overrides": []
-      },
-      "options": {}
-    },
-    {
-      "id": 3,
-      "type": "table",
-      "title": "Disaccordi vs AWS default per sito e user_class",
-      "gridPos": {
-        "x": 0,
-        "y": 19,
-        "w": 12,
-        "h": 10
-      },
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "ch"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "ch"
-          },
-          "editorType": "sql",
-          "queryType": "table",
-          "format": 1,
-          "rawSql": "SELECT site_id, user_class, action, aws_default_action, sum(requests) AS requests FROM waf.agg_requests_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND action != aws_default_action GROUP BY site_id, user_class, action, aws_default_action ORDER BY requests DESC LIMIT 100",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true
-      }
-    },
-    {
-      "id": 4,
-      "type": "table",
-      "title": "Path delle regole in COUNT",
-      "gridPos": {
-        "x": 12,
-        "y": 19,
-        "w": 12,
-        "h": 10
-      },
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "ch"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "ch"
-          },
-          "editorType": "sql",
-          "queryType": "table",
-          "format": 1,
-          "rawSql": "SELECT rule_name, path, count() AS matches FROM waf.matches WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND configured_action = 'COUNT' GROUP BY rule_name, path ORDER BY matches DESC LIMIT 100",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true
-      }
-    },
-    {
-      "id": 5,
-      "type": "barchart",
-      "title": "Match per user_class",
-      "gridPos": {
-        "x": 0,
-        "y": 29,
-        "w": 24,
-        "h": 8
-      },
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "ch"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "ch"
-          },
-          "editorType": "sql",
-          "queryType": "table",
-          "format": 1,
-          "rawSql": "SELECT user_class, sum(matches) AS matches FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) GROUP BY user_class ORDER BY matches DESC",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {
-        "xField": "user_class",
-        "orientation": "horizontal"
-      }
+    "definition": "SELECT DISTINCT site_id FROM waf.agg_requests_1m WHERE minute > now() - INTERVAL 30 DAY ORDER BY site_id",
+    "query": "SELECT DISTINCT site_id FROM waf.agg_requests_1m WHERE minute > now() - INTERVAL 30 DAY ORDER BY site_id",
+    "multi": true,
+    "includeAll": true,
+    "allValue": "'__all__'",
+    "refresh": 2,
+    "sort": 1,
+    "current": {
+     "text": [
+      "All"
+     ],
+     "value": [
+      "$__all"
+     ]
     }
+   },
+   {
+    "name": "regola",
+    "label": "Regola",
+    "type": "query",
+    "datasource": {
+     "type": "grafana-clickhouse-datasource",
+     "uid": "ch"
+    },
+    "multi": true,
+    "includeAll": true,
+    "allValue": "'__all__'",
+    "current": {
+     "text": [
+      "All"
+     ],
+     "value": [
+      "$__all"
+     ]
+    },
+    "refresh": 2,
+    "sort": 1,
+    "query": "SELECT DISTINCT rule_name FROM waf.site_rules_current WHERE kind IN ('managed', 'custom') ORDER BY rule_name"
+   }
   ]
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "table",
+   "title": "Regole in COUNT per sito (candidati would-block)",
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 24,
+    "h": 10
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT site_id, rule_group, rule_name, sum(matches) AS matches FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND configured_action = 'COUNT' GROUP BY site_id, rule_group, rule_name ORDER BY matches DESC LIMIT 100",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {
+    "showHeader": true
+   }
+  },
+  {
+   "id": 2,
+   "type": "timeseries",
+   "title": "Match per regola (top 10)",
+   "gridPos": {
+    "x": 0,
+    "y": 10,
+    "w": 24,
+    "h": 9
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "timeseries",
+     "format": 0,
+     "rawSql": "SELECT $__timeInterval(minute) AS time, rule_name, sum(matches) AS matches FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND rule_name IN (SELECT rule_name FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) GROUP BY rule_name ORDER BY sum(matches) DESC LIMIT 10) GROUP BY time, rule_name ORDER BY time",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "fillOpacity": 10,
+      "drawStyle": "line"
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 3,
+   "type": "table",
+   "title": "Disaccordi vs AWS default per sito e user_class",
+   "gridPos": {
+    "x": 0,
+    "y": 19,
+    "w": 12,
+    "h": 10
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT site_id, user_class, action, aws_default_action, sum(requests) AS requests FROM waf.agg_requests_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND action != aws_default_action GROUP BY site_id, user_class, action, aws_default_action ORDER BY requests DESC LIMIT 100",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {
+    "showHeader": true
+   }
+  },
+  {
+   "id": 4,
+   "type": "table",
+   "title": "Path delle regole in COUNT",
+   "gridPos": {
+    "x": 12,
+    "y": 19,
+    "w": 12,
+    "h": 10
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT rule_name, path, count() AS matches FROM waf.matches WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND configured_action = 'COUNT' GROUP BY rule_name, path ORDER BY matches DESC LIMIT 100",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {
+    "showHeader": true
+   }
+  },
+  {
+   "id": 5,
+   "type": "barchart",
+   "title": "Match per user_class",
+   "gridPos": {
+    "x": 0,
+    "y": 29,
+    "w": 24,
+    "h": 8
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT user_class, sum(matches) AS matches FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) GROUP BY user_class ORDER BY matches DESC",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {
+    "xField": "user_class",
+    "orientation": "horizontal"
+   }
+  },
+  {
+   "type": "row",
+   "title": "Regole configurate (come la pagina Rules della Web ACL AWS)",
+   "collapsed": false,
+   "panels": [],
+   "id": 100,
+   "gridPos": {
+    "x": 0,
+    "y": 37,
+    "w": 24,
+    "h": 1
+   }
+  },
+  {
+   "type": "bargauge",
+   "title": "Capacità usata (WCU) per sito",
+   "description": "Web ACL Capacity Units: somma dei WCU dei gruppi gestiti (valori AWS) + stima delle regole custom e del rate limit. Il limite base AWS è 1500 WCU per Web ACL (oltre si paga, max 5000).",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT site_id AS Sito, sum(wcu) AS WCU FROM waf.site_rules_current WHERE kind IN ('group', 'custom', 'setting') AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) GROUP BY site_id ORDER BY site_id",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "min": 0,
+     "max": 1500,
+     "unit": "none",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1200
+       },
+       {
+        "color": "red",
+        "value": 1500
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "orientation": "horizontal",
+    "displayMode": "gradient",
+    "showUnfilled": true,
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": true
+    },
+    "valueMode": "color",
+    "namePlacement": "left"
+   },
+   "id": 101,
+   "gridPos": {
+    "x": 0,
+    "y": 38,
+    "w": 8,
+    "h": 6
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "table",
+   "title": "Impostazioni dei siti",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT site_id AS Sito, rule_name AS Impostazione, detail AS Valore, any(config_rev) AS `Config` FROM waf.site_rules_current WHERE kind = 'setting' AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) GROUP BY site_id, rule_name, detail ORDER BY site_id, rule_name",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "filterable": true
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Sito"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 80
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Impostazione"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 130
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm"
+   },
+   "id": 102,
+   "gridPos": {
+    "x": 8,
+    "y": 38,
+    "w": 16,
+    "h": 6
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "table",
+   "title": "Regole attive per sito, con match nel periodo",
+   "description": "Ogni regola come in AWS: azione di default, azione effettiva (dopo profili e override), origine dell'override, fedeltà rispetto ad AWS. A destra i match nel periodo: una regola in COUNT con molti match è un candidato da valutare; una regola che non matcha mai non costa nulla.",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT r.site_id AS Sito, r.kind AS Tipo, replaceRegexpOne(r.rule_group, '^AWSManagedRules', '') AS Gruppo, r.rule_name AS Regola, r.default_action AS Default, r.effective_action AS Effettiva, if(r.effective_action != r.default_action AND r.kind = 'managed', '✎ override', '') AS Override, r.origin AS Origine, r.fidelity AS `Fedeltà`, if(r.wcu = 0, NULL, r.wcu) AS WCU, m.matches AS Match, m.blocked AS Bloccate, m.counted AS `In count`, if(m.matches = 0, NULL, m.last) AS `Ultimo match` FROM waf.site_rules_current r LEFT JOIN (SELECT site_id, rule_name, count() AS matches, countIf(request_action = 'BLOCK' AND configured_action = 'BLOCK' AND post_terminating = 0) AS blocked, countIf(configured_action = 'COUNT') AS counted, max(ts) AS last FROM waf.matches WHERE $__timeFilter(ts) GROUP BY site_id, rule_name) m ON m.site_id = r.site_id AND m.rule_name = r.rule_name WHERE r.kind IN ('group', 'managed', 'custom') AND ('__all__' IN (${site:singlequote}) OR r.site_id IN (${site:singlequote})) ORDER BY r.site_id, r.position",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "filterable": true,
+      "inspect": true
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Default"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-text"
+        }
+       },
+       {
+        "id": "mappings",
+        "value": [
+         {
+          "type": "value",
+          "options": {
+           "BLOCK": {
+            "color": "red",
+            "index": 0
+           },
+           "COUNT": {
+            "color": "yellow",
+            "index": 1
+           },
+           "ALLOW": {
+            "color": "green",
+            "index": 2
+           },
+           "ENABLED": {
+            "color": "blue",
+            "index": 3
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Effettiva"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-text"
+        }
+       },
+       {
+        "id": "mappings",
+        "value": [
+         {
+          "type": "value",
+          "options": {
+           "BLOCK": {
+            "color": "red",
+            "index": 0
+           },
+           "COUNT": {
+            "color": "yellow",
+            "index": 1
+           },
+           "ALLOW": {
+            "color": "green",
+            "index": 2
+           },
+           "ENABLED": {
+            "color": "blue",
+            "index": 3
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Override"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-text"
+        }
+       },
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "orange"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Match"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "gauge",
+         "mode": "basic",
+         "valueDisplayMode": "text"
+        }
+       },
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "blue"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Ultimo match"
+      },
+      "properties": [
+       {
+        "id": "unit",
+        "value": "dateTimeFromNow"
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Regola"
+      },
+      "properties": [
+       {
+        "id": "links",
+        "value": [
+         {
+          "title": "Andamento di questa regola",
+          "url": "/d/waf-tuning/?${__url_time_range}&${site:queryparam}&var-regola=${__value.raw}#andamento"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Sito"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 70
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Tipo"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 75
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Default"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 70
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Effettiva"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 75
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Override"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 85
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Fedeltà"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 70
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "WCU"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 55
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm",
+    "footer": {
+     "show": false
+    }
+   },
+   "id": 103,
+   "gridPos": {
+    "x": 0,
+    "y": 44,
+    "w": 24,
+    "h": 18
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "row",
+   "title": "Andamento della regola: $regola",
+   "collapsed": false,
+   "panels": [],
+   "id": 104,
+   "gridPos": {
+    "x": 0,
+    "y": 62,
+    "w": 24,
+    "h": 1
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Andamento di $regola per esito (come le metriche CloudWatch per regola)",
+   "description": "bloccate = la regola ha deciso il blocco; in count = ha trovato qualcosa ma è in count; senza effetto = ha matchato dopo che un'altra regola aveva già deciso, o era fuori scope.",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "timeseries",
+     "format": 0,
+     "rawSql": "SELECT $__timeInterval(ts) AS time, countIf(configured_action = 'BLOCK' AND request_action = 'BLOCK' AND post_terminating = 0) AS bloccate, countIf(configured_action = 'COUNT') AS `in count`, countIf(NOT (configured_action = 'BLOCK' AND request_action = 'BLOCK' AND post_terminating = 0) AND configured_action != 'COUNT') AS `senza effetto` FROM waf.matches WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND ('__all__' IN (${regola:singlequote}) OR rule_name IN (${regola:singlequote})) GROUP BY time ORDER BY time",
+     "refId": "A"
+    }
+   ],
+   "maxDataPoints": 80,
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 80,
+      "stacking": {
+       "mode": "normal"
+      },
+      "lineWidth": 1
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "bloccate"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "red"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "in count"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "yellow"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "senza effetto"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "text"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "id": 105,
+   "gridPos": {
+    "x": 0,
+    "y": 63,
+    "w": 14,
+    "h": 9
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "table",
+   "title": "Dove matcha $regola (percorso e punto della richiesta)",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT rule_name AS Regola, path AS Percorso, waf_dove(variable) AS Dove, configured_action AS Azione, count() AS Match, uniq(client_ip) AS IP, any(substring(value, 1, 100)) AS `Esempio valore` FROM waf.matches WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND ('__all__' IN (${regola:singlequote}) OR rule_name IN (${regola:singlequote})) GROUP BY Regola, Percorso, Dove, Azione ORDER BY Match DESC LIMIT 50",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "filterable": true,
+      "inspect": true
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Azione"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-text"
+        }
+       },
+       {
+        "id": "mappings",
+        "value": [
+         {
+          "type": "value",
+          "options": {
+           "BLOCK": {
+            "color": "red",
+            "index": 0
+           },
+           "COUNT": {
+            "color": "yellow",
+            "index": 1
+           },
+           "ALLOW": {
+            "color": "green",
+            "index": 2
+           },
+           "ENABLED": {
+            "color": "blue",
+            "index": 3
+           }
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm"
+   },
+   "id": 106,
+   "gridPos": {
+    "x": 14,
+    "y": 63,
+    "w": 10,
+    "h": 9
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  }
+ ],
+ "links": [
+  {
+   "type": "dashboards",
+   "tags": [
+    "waf"
+   ],
+   "asDropdown": true,
+   "title": "Altre dashboard WAF"
+  }
+ ]
 }

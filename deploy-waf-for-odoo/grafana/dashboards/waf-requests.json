@@ -1,0 +1,1455 @@
+{
+ "uid": "waf-requests",
+ "title": "WAF Richieste",
+ "tags": [
+  "waf"
+ ],
+ "schemaVersion": 39,
+ "editable": true,
+ "time": {
+  "from": "now-1h",
+  "to": "now"
+ },
+ "refresh": "10s",
+ "timezone": "browser",
+ "graphTooltip": 1,
+ "links": [
+  {
+   "type": "dashboards",
+   "tags": [
+    "waf"
+   ],
+   "asDropdown": true,
+   "title": "Altre dashboard WAF"
+  }
+ ],
+ "description": "Ogni richiesta passata dal WAF: esito e, se bloccata, regola e causa.",
+ "templating": {
+  "list": [
+   {
+    "name": "site",
+    "label": "Sito",
+    "type": "query",
+    "datasource": {
+     "type": "grafana-clickhouse-datasource",
+     "uid": "ch"
+    },
+    "multi": true,
+    "includeAll": true,
+    "allValue": "'__all__'",
+    "current": {
+     "text": [
+      "All"
+     ],
+     "value": [
+      "$__all"
+     ]
+    },
+    "refresh": 2,
+    "sort": 1,
+    "query": "SELECT DISTINCT site_id FROM waf.agg_requests_1m WHERE minute > now() - INTERVAL 30 DAY ORDER BY site_id"
+   },
+   {
+    "name": "esito",
+    "label": "Esito",
+    "type": "custom",
+    "multi": true,
+    "includeAll": true,
+    "allValue": "'__all__'",
+    "query": "Bloccate : BLOCK, Consentite : ALLOW, In count (bloccherebbero) : COUNTED, Errore WAF : FAIL",
+    "current": {
+     "text": [
+      "All"
+     ],
+     "value": [
+      "$__all"
+     ]
+    },
+    "options": []
+   },
+   {
+    "name": "ip",
+    "label": "IP",
+    "type": "textbox",
+    "query": "",
+    "current": {
+     "text": "",
+     "value": ""
+    }
+   },
+   {
+    "name": "cerca",
+    "label": "Cerca (URL, host o regola)",
+    "type": "textbox",
+    "query": "",
+    "current": {
+     "text": "",
+     "value": ""
+    }
+   },
+   {
+    "name": "rid",
+    "label": "request_id",
+    "type": "textbox",
+    "query": "",
+    "current": {
+     "text": "",
+     "value": ""
+    }
+   }
+  ]
+ },
+ "panels": [
+  {
+   "type": "stat",
+   "title": "Richieste",
+   "description": "",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT count() FROM waf.events e WHERE $__timeFilter(e.ts) AND ('__all__' IN (${site:singlequote}) OR e.site_id IN (${site:singlequote})) AND ('__all__' IN (${esito:singlequote}) OR e.action IN (${esito:singlequote}) OR ('COUNTED' IN (${esito:singlequote}) AND e.action = 'ALLOW' AND e.request_id IN (SELECT request_id FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT'))) AND (${ip:sqlstring} = '' OR e.client_ip = ${ip:sqlstring}) AND (${cerca:sqlstring} = '' OR positionCaseInsensitive(concat(e.host, e.path, '?', e.query, ' ', e.terminating_rule), ${cerca:sqlstring}) > 0)",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "blue"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "id": 1,
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "stat",
+   "title": "Bloccate",
+   "description": "",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT countIf(e.action = 'BLOCK') FROM waf.events e WHERE $__timeFilter(e.ts) AND ('__all__' IN (${site:singlequote}) OR e.site_id IN (${site:singlequote})) AND ('__all__' IN (${esito:singlequote}) OR e.action IN (${esito:singlequote}) OR ('COUNTED' IN (${esito:singlequote}) AND e.action = 'ALLOW' AND e.request_id IN (SELECT request_id FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT'))) AND (${ip:sqlstring} = '' OR e.client_ip = ${ip:sqlstring}) AND (${cerca:sqlstring} = '' OR positionCaseInsensitive(concat(e.host, e.path, '?', e.query, ' ', e.terminating_rule), ${cerca:sqlstring}) > 0)",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "red"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "id": 2,
+   "gridPos": {
+    "x": 4,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "stat",
+   "title": "% bloccate",
+   "description": "",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT if(count() = 0, 0, countIf(e.action = 'BLOCK') / count()) FROM waf.events e WHERE $__timeFilter(e.ts) AND ('__all__' IN (${site:singlequote}) OR e.site_id IN (${site:singlequote})) AND ('__all__' IN (${esito:singlequote}) OR e.action IN (${esito:singlequote}) OR ('COUNTED' IN (${esito:singlequote}) AND e.action = 'ALLOW' AND e.request_id IN (SELECT request_id FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT'))) AND (${ip:sqlstring} = '' OR e.client_ip = ${ip:sqlstring}) AND (${cerca:sqlstring} = '' OR positionCaseInsensitive(concat(e.host, e.path, '?', e.query, ' ', e.terminating_rule), ${cerca:sqlstring}) > 0)",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "orange"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "id": 3,
+   "gridPos": {
+    "x": 8,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "stat",
+   "title": "In count (bloccherebbero)",
+   "description": "Richieste consentite su cui una regola in modalità count ha trovato qualcosa: sarebbero bloccate se la regola fosse in block. Su Odoo sono soprattutto RPC con HTML nel body.",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT countIf(e.action = 'ALLOW' AND e.request_id IN (SELECT request_id FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT')) FROM waf.events e WHERE $__timeFilter(e.ts) AND ('__all__' IN (${site:singlequote}) OR e.site_id IN (${site:singlequote})) AND ('__all__' IN (${esito:singlequote}) OR e.action IN (${esito:singlequote}) OR ('COUNTED' IN (${esito:singlequote}) AND e.action = 'ALLOW' AND e.request_id IN (SELECT request_id FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT'))) AND (${ip:sqlstring} = '' OR e.client_ip = ${ip:sqlstring}) AND (${cerca:sqlstring} = '' OR positionCaseInsensitive(concat(e.host, e.path, '?', e.query, ' ', e.terminating_rule), ${cerca:sqlstring}) > 0)",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "yellow"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "id": 4,
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "stat",
+   "title": "IP distinti",
+   "description": "",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT uniq(e.client_ip) FROM waf.events e WHERE $__timeFilter(e.ts) AND ('__all__' IN (${site:singlequote}) OR e.site_id IN (${site:singlequote})) AND ('__all__' IN (${esito:singlequote}) OR e.action IN (${esito:singlequote}) OR ('COUNTED' IN (${esito:singlequote}) AND e.action = 'ALLOW' AND e.request_id IN (SELECT request_id FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT'))) AND (${ip:sqlstring} = '' OR e.client_ip = ${ip:sqlstring}) AND (${cerca:sqlstring} = '' OR positionCaseInsensitive(concat(e.host, e.path, '?', e.query, ' ', e.terminating_rule), ${cerca:sqlstring}) > 0)",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "purple"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "id": 5,
+   "gridPos": {
+    "x": 16,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "stat",
+   "title": "IP bloccati",
+   "description": "",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT uniqIf(e.client_ip, e.action = 'BLOCK') FROM waf.events e WHERE $__timeFilter(e.ts) AND ('__all__' IN (${site:singlequote}) OR e.site_id IN (${site:singlequote})) AND ('__all__' IN (${esito:singlequote}) OR e.action IN (${esito:singlequote}) OR ('COUNTED' IN (${esito:singlequote}) AND e.action = 'ALLOW' AND e.request_id IN (SELECT request_id FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT'))) AND (${ip:sqlstring} = '' OR e.client_ip = ${ip:sqlstring}) AND (${cerca:sqlstring} = '' OR positionCaseInsensitive(concat(e.host, e.path, '?', e.query, ' ', e.terminating_rule), ${cerca:sqlstring}) > 0)",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "dark-red"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "id": 6,
+   "gridPos": {
+    "x": 20,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Richieste nel tempo",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 0,
+     "rawSql": "SELECT $__timeInterval(e.ts) AS time, countIf(e.action = 'ALLOW') AS consentite, countIf(e.action = 'BLOCK') AS bloccate FROM waf.events e WHERE $__timeFilter(e.ts) AND ('__all__' IN (${site:singlequote}) OR e.site_id IN (${site:singlequote})) AND ('__all__' IN (${esito:singlequote}) OR e.action IN (${esito:singlequote}) OR ('COUNTED' IN (${esito:singlequote}) AND e.action = 'ALLOW' AND e.request_id IN (SELECT request_id FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT'))) AND (${ip:sqlstring} = '' OR e.client_ip = ${ip:sqlstring}) AND (${cerca:sqlstring} = '' OR positionCaseInsensitive(concat(e.host, e.path, '?', e.query, ' ', e.terminating_rule), ${cerca:sqlstring}) > 0) GROUP BY time ORDER BY time",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 80,
+      "stacking": {
+       "mode": "normal"
+      },
+      "lineWidth": 1
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "consentite"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "green"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "bloccate"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "red"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "maxDataPoints": 60,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "id": 7,
+   "gridPos": {
+    "x": 0,
+    "y": 4,
+    "w": 14,
+    "h": 8
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "piechart",
+   "title": "Perché vengono bloccate",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT if(e.terminating_type = 'RATE_BASED', 'Rate limit', waf_causa(t.rule_name, e.terminating_type)) AS causa, count() AS richieste FROM waf.events e LEFT JOIN (SELECT request_id, rule_id, rule_name FROM waf.matches WHERE $__timeFilter(ts)) t ON t.request_id = e.request_id AND t.rule_id = e.terminating_rule_id WHERE $__timeFilter(e.ts) AND ('__all__' IN (${site:singlequote}) OR e.site_id IN (${site:singlequote})) AND ('__all__' IN (${esito:singlequote}) OR e.action IN (${esito:singlequote}) OR ('COUNTED' IN (${esito:singlequote}) AND e.action = 'ALLOW' AND e.request_id IN (SELECT request_id FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT'))) AND (${ip:sqlstring} = '' OR e.client_ip = ${ip:sqlstring}) AND (${cerca:sqlstring} = '' OR positionCaseInsensitive(concat(e.host, e.path, '?', e.query, ' ', e.terminating_rule), ${cerca:sqlstring}) > 0) AND e.action = 'BLOCK' GROUP BY causa ORDER BY richieste DESC",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": true
+    },
+    "pieType": "donut",
+    "legend": {
+     "displayMode": "table",
+     "placement": "right",
+     "values": [
+      "value"
+     ]
+    },
+    "displayLabels": []
+   },
+   "id": 8,
+   "gridPos": {
+    "x": 14,
+    "y": 4,
+    "w": 10,
+    "h": 8
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "table",
+   "title": "Richieste (ultime 1000) — clic su request_id per il dettaglio, su IP per filtrarlo",
+   "description": "Una riga per richiesta. Per le bloccate: Regola = regola AWS/custom che ha deciso il blocco, Causa = tipo di attacco, dove è stato trovato e il valore sospetto. 'Regole in count' = regole che hanno trovato qualcosa ma sono configurate per non bloccare.",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT e.ts AS Ora, e.site_id AS Sito, e.client_ip AS IP, e.country AS Paese, e.method AS Metodo, concat(e.host, e.path, if(e.query = '', '', concat('?', e.query))) AS URL, e.status AS Stato, e.action AS Esito, if(e.action = 'ALLOW', '', if(e.terminating_type = 'RATE_BASED', 'RateLimit', replaceRegexpOne(e.terminating_rule, '^[^/]*/', ''))) AS Regola, if(e.action = 'ALLOW', '', if(t.rule_name = 'GeoBlock', concat('Paese bloccato (geo_block): ', e.country), waf_spiega(t.rule_name, e.terminating_type, t.variable, t.value))) AS Causa, arrayStringConcat(c.counted, ', ') AS `Regole in count`, round(e.request_time * 1000) AS ms, e.user_agent AS `User-Agent`, e.request_id AS request_id FROM waf.events e LEFT JOIN (SELECT request_id, rule_id, rule_name, variable, value FROM waf.matches WHERE $__timeFilter(ts)) t ON t.request_id = e.request_id AND t.rule_id = e.terminating_rule_id LEFT JOIN (SELECT request_id, groupUniqArray(rule_name) AS counted FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT' GROUP BY request_id) c ON c.request_id = e.request_id WHERE $__timeFilter(e.ts) AND ('__all__' IN (${site:singlequote}) OR e.site_id IN (${site:singlequote})) AND ('__all__' IN (${esito:singlequote}) OR e.action IN (${esito:singlequote}) OR ('COUNTED' IN (${esito:singlequote}) AND e.action = 'ALLOW' AND e.request_id IN (SELECT request_id FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT'))) AND (${ip:sqlstring} = '' OR e.client_ip = ${ip:sqlstring}) AND (${cerca:sqlstring} = '' OR positionCaseInsensitive(concat(e.host, e.path, '?', e.query, ' ', e.terminating_rule), ${cerca:sqlstring}) > 0) ORDER BY e.ts DESC LIMIT 1000",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "filterable": true,
+      "cellOptions": {
+       "type": "auto"
+      },
+      "inspect": true
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Esito"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-background"
+        }
+       },
+       {
+        "id": "mappings",
+        "value": [
+         {
+          "type": "value",
+          "options": {
+           "BLOCK": {
+            "text": "⛔ BLOCCATA",
+            "color": "red",
+            "index": 0
+           },
+           "ALLOW": {
+            "text": "✅ consentita",
+            "color": "green",
+            "index": 1
+           },
+           "FAIL": {
+            "text": "⚠ errore WAF",
+            "color": "orange",
+            "index": 2
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Stato"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-text"
+        }
+       },
+       {
+        "id": "thresholds",
+        "value": {
+         "mode": "absolute",
+         "steps": [
+          {
+           "color": "green",
+           "value": null
+          },
+          {
+           "color": "blue",
+           "value": 300
+          },
+          {
+           "color": "orange",
+           "value": 400
+          },
+          {
+           "color": "red",
+           "value": 403
+          },
+          {
+           "color": "orange",
+           "value": 404
+          },
+          {
+           "color": "red",
+           "value": 500
+          }
+         ]
+        }
+       },
+       {
+        "id": "color",
+        "value": {
+         "mode": "thresholds"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Ora"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 170
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Sito"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 70
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "IP"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 115
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Paese"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 55
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Metodo"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 65
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Stato"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 55
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Esito"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 110
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "ms"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 50
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "URL"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 260
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Regola"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 215
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Regole in count"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 150
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "request_id"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 95
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Ora"
+      },
+      "properties": [
+       {
+        "id": "unit",
+        "value": "dateTimeAsIso"
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Causa"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-text",
+         "wrapText": true
+        }
+       },
+       {
+        "id": "custom.wrapText",
+        "value": true
+       },
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "red"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Regole in count"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-text"
+        }
+       },
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "yellow"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "request_id"
+      },
+      "properties": [
+       {
+        "id": "links",
+        "value": [
+         {
+          "title": "Dettaglio richiesta",
+          "url": "/d/waf-requests/waf-richieste?${__url_time_range}&${site:queryparam}&var-rid=${__data.fields.request_id}#dettaglio"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "IP"
+      },
+      "properties": [
+       {
+        "id": "links",
+        "value": [
+         {
+          "title": "Solo questo IP",
+          "url": "/d/waf-requests/waf-richieste?${__url_time_range}&${site:queryparam}&var-ip=${__value.raw}"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "User-Agent"
+      },
+      "properties": [
+       {
+        "id": "custom.hidden",
+        "value": true
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm",
+    "footer": {
+     "show": false
+    },
+    "sortBy": [
+     {
+      "displayName": "Ora",
+      "desc": true
+     }
+    ]
+   },
+   "id": 9,
+   "gridPos": {
+    "x": 0,
+    "y": 12,
+    "w": 24,
+    "h": 16
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "table",
+   "title": "Blocchi raggruppati per regola e causa",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT if(e.terminating_type = 'RATE_BASED', 'RateLimit', replaceRegexpOne(e.terminating_rule, '^[^/]*/', '')) AS Regola, waf_causa(t.rule_name, e.terminating_type) AS Causa, waf_dove(t.variable) AS Dove, count() AS Richieste, uniq(e.client_ip) AS IP, uniq(e.path) AS Percorsi, any(concat(e.path, if(e.query = '', '', concat('?', e.query)))) AS `Esempio URL`, any(substring(t.value, 1, 120)) AS `Esempio valore`, max(e.ts) AS Ultima FROM waf.events e LEFT JOIN (SELECT request_id, rule_id, rule_name, variable, value FROM waf.matches WHERE $__timeFilter(ts)) t ON t.request_id = e.request_id AND t.rule_id = e.terminating_rule_id WHERE $__timeFilter(e.ts) AND ('__all__' IN (${site:singlequote}) OR e.site_id IN (${site:singlequote})) AND ('__all__' IN (${esito:singlequote}) OR e.action IN (${esito:singlequote}) OR ('COUNTED' IN (${esito:singlequote}) AND e.action = 'ALLOW' AND e.request_id IN (SELECT request_id FROM waf.matches WHERE $__timeFilter(ts) AND configured_action = 'COUNT'))) AND (${ip:sqlstring} = '' OR e.client_ip = ${ip:sqlstring}) AND (${cerca:sqlstring} = '' OR positionCaseInsensitive(concat(e.host, e.path, '?', e.query, ' ', e.terminating_rule), ${cerca:sqlstring}) > 0) AND e.action = 'BLOCK' GROUP BY Regola, Causa, Dove ORDER BY Richieste DESC LIMIT 100",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "filterable": true
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Ultima"
+      },
+      "properties": [
+       {
+        "id": "unit",
+        "value": "dateTimeFromNow"
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Richieste"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "gauge",
+         "mode": "basic"
+        }
+       },
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "red"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm"
+   },
+   "id": 10,
+   "gridPos": {
+    "x": 0,
+    "y": 28,
+    "w": 24,
+    "h": 8
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "id": 11,
+   "type": "row",
+   "title": "Dettaglio della richiesta: $rid",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 36,
+    "w": 24,
+    "h": 1
+   },
+   "panels": []
+  },
+  {
+   "type": "table",
+   "title": "Richiesta",
+   "description": "Inserisci o seleziona un request_id (clic nella tabella sopra).",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT k AS Campo, v AS Valore FROM ( SELECT [ 'Esito', 'Regola che ha deciso', 'Causa', 'Ora (UTC)', 'Sito', 'URL', 'Metodo', 'Stato HTTP', 'IP client', 'Paese / ASN', 'User-Agent', 'Referer', 'Content-Type', 'Dimensione richiesta', 'Tempo totale / upstream', 'Modalità WAF', 'Esito senza override (AWS default)', 'Label', 'Regole matchate', 'Tipo client (Odoo)', 'Nodo / request_id'] AS ks, [ if(e.action = 'BLOCK', '⛔ BLOCCATA', if(e.action = 'ALLOW', '✅ consentita', e.action)), if(e.action = 'ALLOW', '— (nessuna, azione di default ALLOW)', if(e.terminating_type = 'RATE_BASED', 'RateLimit (rate_limit del sito)', e.terminating_rule)), if(e.action = 'ALLOW', '', if(t.rule_name = 'GeoBlock', concat('Paese bloccato (geo_block): ', e.country), waf_spiega(t.rule_name, e.terminating_type, t.variable, t.value))), toString(e.ts), e.site_id, concat(e.scheme, '://', e.host, e.uri), e.method, toString(e.status), e.client_ip, if(e.country = '' AND e.asn = 0, '— (IP privato o GeoIP non installato)', concat(e.country, ' / AS', toString(e.asn), ' ', e.as_org)), e.user_agent, e.referer, e.content_type, concat(toString(e.request_length), ' byte'), concat(toString(round(e.request_time * 1000)), ' ms / ', toString(round(e.upstream_time * 1000)), ' ms'), e.waf_mode, concat(e.aws_default_action, if(e.aws_default_rule = '', '', concat(' (', e.aws_default_rule, ')'))), arrayStringConcat(e.labels, ', '), toString(e.match_count), e.user_class, concat(e.node_id, ' / ', e.request_id)] AS vs FROM waf.events e LEFT JOIN (SELECT request_id, rule_id, rule_name, variable, value FROM waf.matches WHERE request_id = ${rid:sqlstring}) t ON t.request_id = e.request_id AND t.rule_id = e.terminating_rule_id WHERE e.request_id = ${rid:sqlstring} LIMIT 1 ) ARRAY JOIN ks AS k, vs AS v",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "inspect": true
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Campo"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 230
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": false,
+    "cellHeight": "sm"
+   },
+   "id": 12,
+   "gridPos": {
+    "x": 0,
+    "y": 37,
+    "w": 12,
+    "h": 15
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "table",
+   "title": "Regole che hanno trovato qualcosa",
+   "description": "Tutte le regole che hanno matchato. 'Decisiva' = quella che ha determinato l'esito. Le regole in count registrano senza bloccare.",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT if(m.rule_id = e.terminating_rule_id AND e.action != 'ALLOW', '⛔ decisiva', if(m.post_terminating = 1, 'dopo il blocco', if(m.configured_action = 'COUNT', 'count (solo log)', m.configured_action))) AS Ruolo, m.rule_name AS Regola, m.rule_group AS Gruppo, m.configured_action AS Azione, waf_causa(m.rule_name, '') AS Causa, waf_dove(m.variable) AS Dove, substring(m.value, 1, 300) AS Valore FROM waf.matches m LEFT JOIN (SELECT request_id, terminating_rule_id, action FROM waf.events WHERE request_id = ${rid:sqlstring}) e ON e.request_id = m.request_id WHERE m.request_id = ${rid:sqlstring} ORDER BY m.post_terminating, Ruolo != '⛔ decisiva', m.rule_id",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "inspect": true
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Ruolo"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-background"
+        }
+       },
+       {
+        "id": "mappings",
+        "value": [
+         {
+          "type": "value",
+          "options": {
+           "⛔ decisiva": {
+            "color": "red",
+            "index": 0
+           },
+           "count (solo log)": {
+            "color": "yellow",
+            "index": 1
+           },
+           "dopo il blocco": {
+            "color": "text",
+            "index": 2
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Ruolo"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 120
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Azione"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 70
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Gruppo"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 150
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Regola"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 190
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm"
+   },
+   "id": 13,
+   "gridPos": {
+    "x": 12,
+    "y": 37,
+    "w": 12,
+    "h": 7
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "table",
+   "title": "Header della richiesta",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT k AS Header, v AS Valore FROM (SELECT mapKeys(request_headers) AS ks, mapValues(request_headers) AS vs FROM waf.events WHERE request_id = ${rid:sqlstring} LIMIT 1) ARRAY JOIN ks AS k, vs AS v ORDER BY k",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "inspect": true
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Header"
+      },
+      "properties": [
+       {
+        "id": "custom.width",
+        "value": 200
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm"
+   },
+   "id": 14,
+   "gridPos": {
+    "x": 12,
+    "y": 44,
+    "w": 12,
+    "h": 8
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "table",
+   "title": "Body della richiesta (se registrato)",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT request_body AS Body FROM waf.events WHERE request_id = ${rid:sqlstring} AND request_body != '' LIMIT 1",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "inspect": true,
+      "cellOptions": {
+       "type": "auto",
+       "wrapText": true
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "showHeader": false,
+    "cellHeight": "lg"
+   },
+   "id": 15,
+   "gridPos": {
+    "x": 0,
+    "y": 52,
+    "w": 24,
+    "h": 5
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  },
+  {
+   "type": "table",
+   "title": "Altre richieste dallo stesso IP",
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-clickhouse-datasource",
+      "uid": "ch"
+     },
+     "editorType": "sql",
+     "queryType": "table",
+     "format": 1,
+     "rawSql": "SELECT e.ts AS Ora, e.method AS Metodo, concat(e.path, if(e.query = '', '', concat('?', e.query))) AS URL, e.status AS Stato, e.action AS Esito, if(e.action = 'ALLOW', '', if(e.terminating_type = 'RATE_BASED', 'RateLimit', replaceRegexpOne(e.terminating_rule, '^[^/]*/', ''))) AS Regola, e.request_id AS request_id FROM waf.events e WHERE $__timeFilter(e.ts) AND e.client_ip = (SELECT any(client_ip) FROM waf.events WHERE request_id = ${rid:sqlstring}) ORDER BY e.ts DESC LIMIT 200",
+     "refId": "A"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Esito"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-background"
+        }
+       },
+       {
+        "id": "mappings",
+        "value": [
+         {
+          "type": "value",
+          "options": {
+           "BLOCK": {
+            "text": "⛔ BLOCCATA",
+            "color": "red",
+            "index": 0
+           },
+           "ALLOW": {
+            "text": "✅ consentita",
+            "color": "green",
+            "index": 1
+           },
+           "FAIL": {
+            "text": "⚠ errore WAF",
+            "color": "orange",
+            "index": 2
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Stato"
+      },
+      "properties": [
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-text"
+        }
+       },
+       {
+        "id": "thresholds",
+        "value": {
+         "mode": "absolute",
+         "steps": [
+          {
+           "color": "green",
+           "value": null
+          },
+          {
+           "color": "blue",
+           "value": 300
+          },
+          {
+           "color": "orange",
+           "value": 400
+          },
+          {
+           "color": "red",
+           "value": 403
+          },
+          {
+           "color": "orange",
+           "value": 404
+          },
+          {
+           "color": "red",
+           "value": 500
+          }
+         ]
+        }
+       },
+       {
+        "id": "color",
+        "value": {
+         "mode": "thresholds"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "request_id"
+      },
+      "properties": [
+       {
+        "id": "links",
+        "value": [
+         {
+          "title": "Dettaglio richiesta",
+          "url": "/d/waf-requests/waf-richieste?${__url_time_range}&${site:queryparam}&var-rid=${__data.fields.request_id}#dettaglio"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Ora"
+      },
+      "properties": [
+       {
+        "id": "unit",
+        "value": "dateTimeAsIso"
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm"
+   },
+   "id": 16,
+   "gridPos": {
+    "x": 0,
+    "y": 57,
+    "w": 24,
+    "h": 8
+   },
+   "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "ch"
+   }
+  }
+ ]
+}

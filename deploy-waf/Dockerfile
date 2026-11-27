@@ -64,7 +64,7 @@ RUN mkdir -p /etc/waf/runtime /etc/waf/lists /etc/waf/certs /etc/waf/geoip /var/
  && chown -R nginx:nginx /var/log/waf
 
 COPY deploy-waf/bin/ /usr/local/bin/
-RUN chmod 0755 /usr/local/bin/waf /usr/local/bin/waf-entrypoint
+RUN chmod 0755 /usr/local/bin/waf /usr/local/bin/waf-entrypoint /usr/local/bin/waf-publish
 
 EXPOSE 8080 8443
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s CMD wget -qO- http://127.0.0.1:8090/healthz || exit 1

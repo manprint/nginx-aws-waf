@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""waf-publish — pubblica in ClickHouse (tabella waf.site_rules) la configurazione attiva di ogni sito:
+gruppi gestiti con i WCU, regole con azione di default ed effettiva, regole custom, impostazioni.
+È l'equivalente della pagina "Rules" di una Web ACL AWS e alimenta i pannelli Grafana sulle regole/WCU.
+
+Attivo solo se WAF_CH_INGEST_PASSWORD è impostata. Variabili: WAF_CH_URL (default http://clickhouse:8123),
+WAF_CH_INGEST_USER (default waf_ingest). Uscita 0 anche se ClickHouse non risponde: riprova al giro dopo.
+
+  waf-publish            pubblica se la rev attiva non è già stata pubblicata
+  waf-publish --force    pubblica comunque
+"""
+import base64, datetime, json, os, re, subprocess, sys, urllib.request
+
+RT = "/etc/waf/runtime/current"
+STATE = "/srv/waf/state/published.rev"
+CATALOG = "/opt/waf/waf/catalog/rules.yaml"
+
+
+def log(msg):
+    print(f"waf-publish: {msg}", file=sys.stderr)
+
+
+def group_wcu():
+    """{group name: WCU} letto dal catalogo (senza dipendere da PyYAML)."""
+    out, name = {}, None
+    try:
+        for line in open(CATALOG):
+            m = re.match(r"^    name: (\S+)", line)
+            if m:
+                name = m.group(1)
+            m = re.match(r"^    wcu: (\d+)", line)
+            if m and name:
+                out[name] = int(m.group(1))
+    except OSError:
+        pass
+    return out
+
+
+def custom_wcu(text):
+    """Stima dei WCU di una regola custom (regole AWS: label/geo/ip/size 1, regex 3, rate-based 2)."""
+    t = re.sub(r"label \S+", "label ", text.lower())  # il nome della label non conta
+    w = t.count("label ") + t.count("geo") + t.count("ip ") + t.count("size") + 3 * t.count("regex")
+    return max(w, 1)
+
+
+def main():
+    pwd = os.environ.get("WAF_CH_INGEST_PASSWORD", "")
+    if not pwd:
+        return 0
+    try:
+        meta = json.load(open(f"{RT}/meta.json"))
+    except (OSError, ValueError):
+        return 0
+    rev = meta.get("config_rev", "")
+    force = "--force" in sys.argv
+    if not force and os.path.exists(STATE) and open(STATE).read().strip() == rev:
+        return 0
+
+    wcu = group_wcu()
+    now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    rows = []
+    for site in meta.get("sites", []):
+        try:
+            ex = json.loads(subprocess.run(["wafctl", "explain", site, "--format", "json"],
+                                           capture_output=True, text=True, check=True).stdout)
+        except (subprocess.CalledProcessError, ValueError) as e:
+            log(f"explain {site} fallito: {e}")
+            continue
+        base = {"ts": now, "node_id": meta.get("node_id", ""), "site_id": site, "config_rev": rev}
+
+        def add(pos, kind, group="", rule="", default="", effective="", origin="", fidelity="", w=0, detail=""):
+            rows.append(dict(base, position=pos, kind=kind, rule_group=group, rule_name=rule,
+                             default_action=default.upper(), effective_action=effective.upper(),
+                             origin=origin, fidelity=fidelity, wcu=w, detail=detail))
+
+        pos = 0
+        seen = []
+        for r in ex.get("rules", []):
+            if r["group"] not in seen:
+                seen.append(r["group"])
+                add(pos, "group", r["group"], w=wcu.get(r["group"], 0), effective="enabled")
+                pos += 1
+            add(pos, "managed", r["group"], r["rule"], r.get("default", ""), r.get("effective", ""),
+                r.get("origin", ""), r.get("fidelity", ""))
+            pos += 1
+        for c in ex.get("custom_rules") or []:
+            m = re.match(r"^\d+\.\s*(?:\[(?P<slot>[^\]]*)\]\s*)?(?P<name>\S+)\s+(?P<act>\w+):\s*(?P<rest>.*?)(?:\s*\((?P<origin>[^()]*)\))?$", c)
+            name = m.group("name") if m else c[:60]
+            act = m.group("act") if m else ""
+            origin = ((m.group("origin") or "") + (" [" + m.group("slot") + "]" if m.group("slot") else "")) if m else ""
+            add(pos, "custom", "custom:" + site, name, act, act, origin.strip(), "", custom_wcu(c), c)
+            pos += 1
+        for k, v in (ex.get("settings") or {}).items():
+            w = 2 if k == "rate_limit" and v != "none" else 0
+            add(pos, "setting", rule=k, effective=str(v)[:20] if k == "mode" else "", w=w, detail=str(v))
+            pos += 1
+        for p in ex.get("path_overrides") or []:
+            add(pos, "path_override", detail=json.dumps(p, ensure_ascii=False) if not isinstance(p, str) else p)
+            pos += 1
+        for k, v in (ex.get("scope_downs") or {}).items():
+            add(pos, "scope_down", k, detail=str(v))
+            pos += 1
+        add(pos, "setting", rule="profiles", detail=" → ".join(ex.get("profiles", [])))
+
+    if not rows:
+        return 0
+    url = os.environ.get("WAF_CH_URL", "http://clickhouse:8123").rstrip("/")
+    user = os.environ.get("WAF_CH_INGEST_USER", "waf_ingest")
+    body = "\n".join(json.dumps(r, ensure_ascii=False) for r in rows).encode()
+    req = urllib.request.Request(
+        f"{url}/?query=" + urllib.request.quote("INSERT INTO waf.site_rules FORMAT JSONEachRow"),
+        data=body, headers={"Authorization": "Basic " + base64.b64encode(f"{user}:{pwd}".encode()).decode()})
+    try:
+        urllib.request.urlopen(req, timeout=10).read()
+    except Exception as e:  # ClickHouse non ancora pronto: si riprova al prossimo `waf reload`
+        log(f"ClickHouse non raggiungibile ({e}); riprovo più tardi")
+        return 0
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    open(STATE, "w").write(rev)
+    log(f"config {rev} pubblicata ({len(rows)} righe)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
