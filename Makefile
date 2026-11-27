@@ -26,6 +26,11 @@ export WAF_NODE_ID ?= lab-node-1
 # lab node.yaml: role all-in-one, network bridge → node + central compose files (same as wafctl apply)
 COMPOSE_NODE = docker compose -p waf --env-file $(WAF_CONFIG_DIR)/secrets.env -f deploy/compose/node.yml -f deploy/compose/node.bridge.yml -f deploy/compose/central.yml -f deploy/compose/central.bridge.yml -f deploy/compose/lab-min.yml
 
+.PHONY: dashboards
+dashboards: ## regenerate deploy/grafana/dashboards/*.json from deploy/grafana/panels.py
+	python3 scripts/gen-dashboards.py
+	python3 scripts/gen-dashboards.py --check
+
 .PHONY: geoip-test
 geoip-test: ## MaxMind test databases as $(WAF_DATA_DIR)/geoip/GeoLite2-{Country,ASN}.mmdb (lab only)
 	mkdir -p $(WAF_DATA_DIR)/geoip
@@ -34,7 +39,7 @@ geoip-test: ## MaxMind test databases as $(WAF_DATA_DIR)/geoip/GeoLite2-{Country
 
 .PHONY: lab-min-up lab-min-down
 lab-min-up: wafctl lists ## start the minimal lab (WAF node + echo + central ClickHouse/Vector)
-	mkdir -p .run/runtime .run/logs .run/certs .run/geoip .run/raw .run/vector $(WAF_CENTRAL_DIR)/clickhouse $(WAF_CENTRAL_DIR)/vector $(WAF_CENTRAL_DIR)/prometheus/data
+	mkdir -p .run/runtime .run/logs .run/certs .run/geoip .run/raw .run/vector $(WAF_CENTRAL_DIR)/clickhouse $(WAF_CENTRAL_DIR)/vector $(WAF_CENTRAL_DIR)/prometheus/data $(WAF_CENTRAL_DIR)/grafana/data
 	./wafctl/bin/wafctl secrets init
 	@[ -s $(WAF_DATA_DIR)/geoip/GeoLite2-Country.mmdb ] || $(MAKE) geoip-test
 	./wafctl/bin/wafctl apply

@@ -33,6 +33,7 @@ type Compose struct {
 type Params struct {
 	Home, Role, Network, NodeID    string
 	DataDir, ConfigDir, CentralDir string
+	Extra                          []string // extra KEY=value environment (e.g. GF_BIND)
 }
 
 // Files returns the compose files for a role (relative to home/deploy/compose):
@@ -85,6 +86,7 @@ func NewCompose(p Params) (*Compose, error) {
 	}
 	c := &Compose{Project: proj, Files: files, Env: []string{"WAF_DATA_DIR=" + p.DataDir, "WAF_CONFIG_DIR=" + p.ConfigDir,
 		"WAF_CENTRAL_DIR=" + p.CentralDir, "WAF_NODE_ID=" + p.NodeID}}
+	c.Env = append(c.Env, p.Extra...)
 	if sf := filepath.Join(p.ConfigDir, "secrets.env"); fileExists(sf) {
 		c.EnvFile = sf
 	}

@@ -54,6 +54,34 @@ services:
       - ${WAF_CENTRAL_DIR}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ${WAF_CENTRAL_DIR}/prometheus/data:/prometheus
     networks: [central]
+  grafana:
+    image: grafana/grafana:13.2.7
+    restart: unless-stopped
+    user: "0:0"   # bind-mounted data dir created by wafctl/docker (not owned by uid 472)
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:?run wafctl secrets init}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_PLUGINS_PREINSTALL_SYNC: grafana-clickhouse-datasource@4.24.0
+      GF_SERVER_ROOT_URL: ${GF_ROOT_URL:-http://localhost:3000/}
+      WAF_CH_RO_PASSWORD: ${WAF_CH_RO_PASSWORD:?}
+    volumes:
+      - ${WAF_CENTRAL_DIR}/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ${WAF_CENTRAL_DIR}/grafana/data:/var/lib/grafana
+      - ../grafana/dashboards:/var/lib/grafana-dashboards:ro
+    ports: ["${GF_BIND:-127.0.0.1:3000}:3000"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      clickhouse: {condition: service_healthy}
+    networks: [central]
 networks:
   central:
     name: waf_central

@@ -1,7 +1,12 @@
 package central
 
 import (
+	"context"
 	"flag"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,11 +74,40 @@ func TestCEN2_PrometheusGolden(t *testing.T) {
 	golden(t, "prometheus.yml", files["prometheus/prometheus.yml"])
 	out := t.TempDir()
 	ch, err := Render(Defaults(), t.TempDir(), out)
-	if err != nil || len(ch) != 1 || ch[0] != "prometheus" {
+	if err != nil || strings.Join(ch, ",") != "grafana,prometheus" {
 		t.Fatalf("first render changed %v %v", ch, err)
 	}
 	ch, _ = Render(Defaults(), t.TempDir(), out)
 	if len(ch) != 0 {
 		t.Errorf("second render changed %v", ch)
+	}
+}
+
+func TestG1_UserAddRequestGolden(t *testing.T) {
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		u, p, _ := r.BasicAuth()
+		got = append(got, fmt.Sprintf("%s %s auth=%s:%s %s", r.Method, r.URL.Path, u, p, b))
+		if r.Method == http.MethodPost {
+			w.Write([]byte(`{"id":7,"message":"User created"}`))
+			return
+		}
+		w.Write([]byte(`{"message":"ok"}`))
+	}))
+	defer srv.Close()
+	g := &GrafanaAPI{URL: srv.URL, User: "admin", Password: "pw"}
+	id, err := g.AddUser(context.Background(), "viewer1", "Viewer One", "", "Viewer", "s3cret")
+	if err != nil || id != 7 {
+		t.Fatalf("id %d err %v", id, err)
+	}
+	golden(t, "grafana-user-add.txt", []byte(strings.Join(got, "\n")+"\n"))
+	files, _ := Files(Defaults(), t.TempDir())
+	ds := string(files["grafana/provisioning/datasources/waf.yaml"])
+	if !strings.Contains(ds, "password: $WAF_CH_RO_PASSWORD") || !strings.Contains(ds, "uid: ch") || !strings.Contains(ds, "uid: prom") {
+		t.Errorf("datasources: %s", ds)
+	}
+	if p, _ := RandomPassword(20); len(p) != 20 {
+		t.Errorf("password length %d", len(p))
 	}
 }

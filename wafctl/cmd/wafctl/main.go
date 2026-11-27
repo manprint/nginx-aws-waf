@@ -24,6 +24,7 @@ var commands = map[string]func([]string) int{
 	"report":   cmdReport,
 	"ch":       cmdCH,
 	"central":  cmdCentral,
+	"grafana":  cmdGrafana,
 }
 
 func usage() {

@@ -16,7 +16,7 @@ import (
 var tmplFS embed.FS
 
 // Components are the rendered sub-directories of $WAF_CENTRAL_DIR, each owned by one service.
-var Components = map[string]string{"prometheus": "prometheus"}
+var Components = map[string]string{"prometheus": "prometheus", "grafana": "grafana"}
 
 // Files returns the rendered files (path relative to $WAF_CENTRAL_DIR → content).
 func Files(c Config, configDir string) (map[string][]byte, error) {
@@ -24,7 +24,11 @@ func Files(c Config, configDir string) (map[string][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string][]byte{"prometheus/prometheus.yml": prom}, nil
+	files := map[string][]byte{"prometheus/prometheus.yml": prom}
+	for k, v := range grafanaFiles() {
+		files[k] = v
+	}
+	return files, nil
 }
 
 // Render writes the files into outDir and returns the services whose files changed.

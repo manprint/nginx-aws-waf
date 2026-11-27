@@ -1,0 +1,2 @@
+POST /api/admin/users auth=admin:pw {"name":"Viewer One","email":"viewer1@localhost","login":"viewer1","password":"s3cret","OrgId":1}
+PATCH /api/org/users/7 auth=admin:pw {"role":"Viewer"}
