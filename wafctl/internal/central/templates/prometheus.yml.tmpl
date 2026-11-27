@@ -1,0 +1,6 @@
+# Rendered by wafctl central render — do not edit.
+global: {scrape_interval: 15s, evaluation_interval: 15s}
+scrape_configs:
+  - {job_name: vector, static_configs: [{targets: ["vector-central:9598"]}]}
+  - {job_name: clickhouse, static_configs: [{targets: ["clickhouse:9363"]}]}
+  - {job_name: prometheus, static_configs: [{targets: ["localhost:9090"]}]}

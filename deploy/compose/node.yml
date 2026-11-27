@@ -26,3 +26,9 @@ services:
       - ${WAF_DATA_DIR}/logs:/var/log/waf:ro
       - ${WAF_DATA_DIR}/raw:/var/lib/waf/raw
       - ${WAF_DATA_DIR}/vector:/var/lib/vector
+      # host_metrics reads the host, not the container
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    environment:
+      PROCFS_ROOT: /host/proc
+      SYSFS_ROOT: /host/sys

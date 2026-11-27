@@ -23,7 +23,7 @@ func TestC0_ForwardRender(t *testing.T) {
 			t.Errorf("%+v: address %q, want %q", r.n, got, r.want)
 		}
 		y := string(forwardYAML(&r.n))
-		for _, tr := range []string{"fwd_events:", "fwd_matches:", "fwd_hb:"} {
+		for _, tr := range []string{"fwd_events:", "fwd_matches:", "fwd_hb:", "m_host:", "m_nginx:", "m_vector:", "m_tag:", "fwd_hb, m_tag]"} {
 			if !strings.Contains(y, tr) {
 				t.Errorf("missing %s", tr)
 			}
@@ -38,6 +38,17 @@ func TestC0_ForwardRender(t *testing.T) {
 	}
 	if got := CentralAddress(&config.Node{Role: "node", Central: config.Central{Address: "fd00::5", IngestPort: 6000}}); got != "[fd00::5]:6000" {
 		t.Errorf("ipv6 address: %q", got)
+	}
+}
+
+func TestCEN0_MetricsRender(t *testing.T) {
+	b := string(forwardYAML(&config.Node{NodeID: "lab-node-1", Role: "all-in-one", Network: "bridge"}))
+	h := string(forwardYAML(&config.Node{NodeID: "n1", Role: "node", Network: "host"}))
+	if !strings.Contains(b, `"http://waf:8090/nginx_status"`) || !strings.Contains(b, `.tags.node_id = "lab-node-1"`) {
+		t.Errorf("bridge metrics: %s", b)
+	}
+	if !strings.Contains(h, `"http://127.0.0.1:8090/nginx_status"`) || !strings.Contains(h, `.tags.node_id = "n1"`) {
+		t.Errorf("host metrics: %s", h)
 	}
 }
 

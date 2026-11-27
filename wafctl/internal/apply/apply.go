@@ -152,6 +152,7 @@ func Apply(p *Prepared, eng docker.Engine, runtimeDir string, o Options) (string
 	// node Vector reads runtime/current/vector/forward.yaml only at start: restart it on change
 	prevFwd, _ := os.ReadFile(filepath.Join(cur, "vector", "forward.yaml"))
 	fwdChanged := !bytes.Equal(prevFwd, p.Out.Files["vector/forward.yaml"])
+	prevRev, _ := os.Readlink(cur)
 	_ = os.Remove(cur + ".new")
 	if err := os.Symlink(rev, cur+".new"); err != nil {
 		return "", err
@@ -171,6 +172,14 @@ func Apply(p *Prepared, eng docker.Engine, runtimeDir string, o Options) (string
 				break
 			}
 			if time.Now().After(deadline) {
+				// the running nginx kept the old rev (e.g. a listen address it cannot bind on reload):
+				// point current back to it so files and the running config agree
+				if prevRev != "" && prevRev != rev {
+					_ = os.Remove(cur + ".new")
+					if os.Symlink(prevRev, cur+".new") == nil && os.Rename(cur+".new", cur) == nil {
+						return "", fmt.Errorf("nginx did not load %s within 15s after reload; current restored to %s (see logs/error.log; a changed listen address needs a container restart: docker compose restart waf, then apply again)", rev, prevRev)
+					}
+				}
 				return "", fmt.Errorf("nginx did not load %s within 15s after reload", rev)
 			}
 			time.Sleep(100 * time.Millisecond)

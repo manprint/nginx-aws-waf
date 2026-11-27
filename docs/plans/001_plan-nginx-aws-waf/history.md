@@ -180,3 +180,15 @@
   - SQL parameterisation: all user values are `{name:Type}` params (TestQ1_ asserts absence of values from SQL); string concatenation in ch/logs/stats only joins constants (fixed fragments, DDL column names, fixed table lists). `ch retention` days are a `{days:UInt32}` param. No injection path found.
   - Docs: observability.md copy-paste checked (3.6).
 - README obligation met (Osservabilità section, docs/observability.md, operations.md).
+
+## 4.1 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW internal/central/{config,render,central_test}.go + templates/prometheus.yml.tmpl + testdata/prometheus.yml, tests/e2e/metrics.sh, cmd `central render`. WRITE render/vector.go (metrics in forward.yaml), nginx.conf.tmpl (status listen), deploy/vector/central.yaml (vrl route conditions, `metric` route, `prom` exporter :9598), compose node.yml (/proc,/sys ro + PROCFS_ROOT/SYSFS_ROOT), central.yml (prometheus), cmd apply/validate (central.yaml), apply.go (rollback), Makefile (prometheus/data).
+- Deviations (non-weakening):
+  - Template embedded from `wafctl/internal/central/templates/` instead of `deploy/prometheus/prometheus.yml.tmpl` (go:embed cannot leave the module).
+  - Metric sources + `m_tag` are rendered into `forward.yaml` with literal values (status URL by network, node_id) instead of `${WAF_NGINX_STATUS_URL}`/`${WAF_NODE_ID}` in node.yaml: Vector 0.62 would need VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION on every node. Same sources/collectors/interval as the plan.
+  - central.yaml validation lives in cmd validate/apply (`central.Config.Validate`) rather than config/validate.go (avoids a config↔central dependency); same checks, apply refuses on errors.
+  - prometheus runs as `user: "0:0"` (bind-mounted data dir created by wafctl/docker is not owned by the image's nobody user). Not published.
+  - Role `central`: apply renders central files and runs compose up (no nginx). all-in-one: central render before the node apply, then compose up -d (starts new services) and restarts services whose rendered dir hash changed.
+- Found + fixed: changing the status `listen` (127.0.0.1:8090 → 8090) cannot be applied by reload (`bind() to 0.0.0.0:8090 failed (98: Address in use)`): apply timed out with `current` already pointing at the new rev. apply now restores `current` to the previous rev on that timeout and says a container restart is needed (TestA3_). Lab transitioned with `docker restart waf-waf-1` + apply.
+- Actual metric names (for 4.2): `nginx_http_requests_total` (plan: nginx_requests_total), `vector_buffer_size_bytes` (plan: vector_buffer_byte_size), `nginx_connections_active`, `host_cpu_seconds_total`, `host_memory_available_bytes`, `ClickHouseMetrics_Query` as planned; `vector_component_errors_total` appears only once an error happened.
+- G-U41: TestCEN1_, TestCEN2_ PASS (+ TestCEN0_ render, TestA3_); metrics.sh ALL PASS (up 3 targets, nginx_connections_active{node_id="lab-node-1"} 1 series, host metrics); central.sh, apply.sh, joinlog.sh ALL PASS; test-e2e 62/62. host_metrics filesystem collector works (no permission error).

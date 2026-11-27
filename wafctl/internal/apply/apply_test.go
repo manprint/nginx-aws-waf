@@ -112,3 +112,19 @@ func TestB2_BypassRendersCount(t *testing.T) {
 		t.Errorf("tuned affected by demo bypass")
 	}
 }
+
+func TestA3_ReloadNotLoadedRestoresCurrent(t *testing.T) {
+	p := prepared(t)
+	rt := t.TempDir()
+	old := "20250101T000000Z-aaaaaaaa"
+	os.Mkdir(filepath.Join(rt, old), 0o755)
+	os.Symlink(old, filepath.Join(rt, "current"))
+	eng := &fakeEngine{running: true, rev: "/etc/waf/runtime/" + old} // workers keep serving the old rev
+	_, err := Apply(p, eng, rt, Options{})
+	if err == nil || !strings.Contains(err.Error(), "current restored to "+old) {
+		t.Fatalf("err %v", err)
+	}
+	if got, _ := os.Readlink(filepath.Join(rt, "current")); got != old {
+		t.Errorf("current -> %s, want %s", got, old)
+	}
+}

@@ -42,6 +42,18 @@ services:
     depends_on:
       clickhouse: {condition: service_healthy}
     networks: [central]
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    restart: unless-stopped
+    user: "0:0"   # data dir is created by wafctl (not owned by the image's nobody user)
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+    volumes:
+      - ${WAF_CENTRAL_DIR}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${WAF_CENTRAL_DIR}/prometheus/data:/prometheus
+    networks: [central]
 networks:
   central:
     name: waf_central

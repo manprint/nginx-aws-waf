@@ -31,7 +31,7 @@ http {
   modsecurity on;
   modsecurity_rules_file {{.R}}/modsec/main.conf;
   modsecurity_transaction_id "$request_id";
-  server { listen 127.0.0.1:8090; access_log off; modsecurity off;
+  server { listen {{if .Bridge}}8090{{else}}127.0.0.1:8090{{end}}; access_log off; modsecurity off;
     location = /nginx_status { stub_status; }
     location = /healthz { return 200 "ok\n"; }
     location = /__rev { return 200 "{{.R}}\n"; } }

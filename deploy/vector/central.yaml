@@ -1,4 +1,5 @@
-# Central Vector: receives from node Vectors, enriches events (GeoIP) and stores in ClickHouse.
+# Central Vector: receives from node Vectors, enriches events (GeoIP) and stores in ClickHouse;
+# node health metrics are exposed to Prometheus on :9598.
 data_dir: /var/lib/vector
 enrichment_tables:
   # Country DBs: the geoip table rejects them ("Unsupported MMDB database type"); the generic mmdb
@@ -12,9 +13,10 @@ transforms:
     type: route
     inputs: [from_nodes]
     route:
-      event: '._t == "event"'
-      match: '._t == "match"'
-      hb: '._t == "hb"'
+      event: {type: vrl, source: 'is_string(._t) && ._t == "event"'}
+      match: {type: vrl, source: 'is_string(._t) && ._t == "match"'}
+      hb: {type: vrl, source: 'is_string(._t) && ._t == "hb"'}
+      metric: {type: is_metric}
   enrich:
     type: remap
     inputs: [route_t.event]
@@ -58,3 +60,8 @@ sinks:
     date_time_best_effort: true
     auth: {strategy: basic, user: waf_ingest, password: "${WAF_CH_INGEST_PASSWORD}"}
     batch: {timeout_secs: 2}
+  prom:
+    type: prometheus_exporter
+    inputs: [route_t.metric]
+    address: "0.0.0.0:9598"
+    flush_period_secs: 60
