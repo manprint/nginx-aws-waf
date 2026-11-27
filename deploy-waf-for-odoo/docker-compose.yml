@@ -25,7 +25,7 @@ services:
   # ============================================================ permessi dei bind mount
   # Crea le cartelle in ./data con il proprietario giusto per ogni servizio, poi esce.
   init-dirs:
-    image: ${WAF_IMAGE:-nginx-aws-waf/aio:latest}
+    image: ${WAF_IMAGE:-ghcr.io/manprint/nginx-aws-waf/aio:latest}
     entrypoint: ["sh", "-c"]
     command:
       - |
@@ -40,7 +40,7 @@ services:
   # ============================================================ WAF
   # Unico servizio esposto. Ispeziona ogni richiesta (regole AWS, profilo odoo-14) e la passa a nginx.
   waf:
-    image: ${WAF_IMAGE:-nginx-aws-waf/aio:latest}
+    image: ${WAF_IMAGE:-ghcr.io/manprint/nginx-aws-waf/aio:latest}
     build:
       context: ..
       dockerfile: deploy-waf/Dockerfile
@@ -169,7 +169,7 @@ services:
   #   docker compose run --rm geoip-dbip       # DB-IP Lite, gratuito, senza account (CC BY 4.0)
   #   docker compose run --rm geoip-maxmind    # MaxMind GeoLite2, serve account gratuito (GEOIPUPDATE_* nel .env)
   geoip-dbip:
-    image: ${WAF_IMAGE:-nginx-aws-waf/aio:latest}
+    image: ${WAF_IMAGE:-ghcr.io/manprint/nginx-aws-waf/aio:latest}
     profiles: [geoip]
     entrypoint: ["sh", "/dbip.sh"]
     volumes:

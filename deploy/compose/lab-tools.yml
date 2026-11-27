@@ -19,7 +19,7 @@ services:
     networks: [lab]
   nikto:
     build: ../../lab/nikto
-    image: waf-lab-nikto:2.6.1
+    image: ghcr.io/manprint/nginx-aws-waf/nikto:latest
     profiles: [tools]
     volumes:
       - ../../build/lab:/out

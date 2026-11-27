@@ -32,7 +32,7 @@ avvio (immagini e plugin ClickHouse di Grafana).
 
 ```sh
 cd deploy-waf-for-odoo
-docker compose up -d --build      # primo avvio: 1-3 minuti (build WAF + creazione database Odoo)
+docker compose up -d              # primo avvio: 1-3 minuti (download immagini + creazione database Odoo)
 docker compose ps                 # waf, clickhouse e db "healthy"; init-dirs e odoo-init "Exited (0)"
 ```
 
@@ -52,7 +52,7 @@ docker compose up -d
 
 | Servizio | Immagine | Ruolo | Esposto |
 |---|---|---|---|
-| `waf` | `nginx-aws-waf/aio` (da `../deploy-waf/Dockerfile`) | nginx + ModSecurity con le regole AWS WAF; unico ingresso | **:80** |
+| `waf` | `ghcr.io/manprint/nginx-aws-waf/aio` (pubblicata su ghcr.io; build locale da `../deploy-waf/Dockerfile` se il pull fallisce) | nginx + ModSecurity con le regole AWS WAF; unico ingresso | **:80** |
 | `nginx` | `nginx:alpine` | il "tuo" nginx: config classica Odoo + Grafana (`nginx/default.conf`) | no |
 | `odoo` | `odoo:14` | Odoo, 2 worker + longpolling sulla porta 8072 | no |
 | `odoo-init` | `odoo:14` | crea il database `odoo` al primo avvio, poi esce | — |

@@ -145,8 +145,25 @@ Novità per versione: [CHANGELOG.md](CHANGELOG.md).
 | `deploy/terraform/` | scheletro Terraform AWS (security group, istanze, user-data), solo `make tf-validate` |
 | `tests/` | corpus di richieste, e2e, flussi legittimi Playwright (`tests/legit/`) |
 | `scripts/` | fetch, `lab-env.sh`, `ngx-test.sh`, `bench.sh`, `lab-attack.sh`, `lab-matrix.sh` (+ `sql/`), `gen-dashboards.py`, `check-dashboards.sh`, `build-release.sh`, `install-node.sh`, `aws-validate-acl.sh`, `tf-validate-export.sh`, `final-check.sh` |
+| `deploy-waf/` | WAF all-in-one in un container (davanti a un nginx esistente), con README dettagliato |
+| `deploy-waf-for-odoo/` | stack locale completo: WAF, nginx, Odoo 14, Postgres, ClickHouse, Prometheus, Grafana |
+| `.github/workflows/images.yml` | build e pubblicazione delle immagini su ghcr.io (sotto) |
 | `data/` | liste IP e definizioni AWS scaricate |
 | `docs/` | documentazione (sotto) e piani (`docs/plans/`) |
+
+## Immagini Docker
+
+Il workflow `.github/workflows/images.yml` pubblica su GitHub Container Registry, per amd64 e arm64:
+
+| Immagine | Dockerfile |
+|---|---|
+| `ghcr.io/manprint/nginx-aws-waf/aio` | `deploy-waf/Dockerfile` |
+| `ghcr.io/manprint/nginx-aws-waf/waf` | `waf/Dockerfile` |
+| `ghcr.io/manprint/nginx-aws-waf/nikto` | `lab/nikto/Dockerfile` |
+
+Tag: `latest` (push su `main`), `<sha8>` (ogni build), `vX.Y.Z` (push di un tag git `vX.Y.Z`).
+Nelle pull request le immagini vengono solo costruite. Dettagli in
+[deploy-waf/README.md](deploy-waf/README.md#15-immagini-pubblicate).
 
 ## Documentazione
 

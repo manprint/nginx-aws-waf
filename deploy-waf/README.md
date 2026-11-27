@@ -35,6 +35,7 @@ configurazioni. Pubblica anche le **metriche Prometheus**.
 12. [Installazione su una macchina senza internet](#12-installazione-su-una-macchina-senza-internet)
 13. [Problemi comuni](#13-problemi-comuni)
 14. [Come funziona dentro](#14-come-funziona-dentro)
+15. [Immagini pubblicate](#15-immagini-pubblicate)
 
 ---
 
@@ -43,9 +44,9 @@ configurazioni. Pubblica anche le **metriche Prometheus**.
 - Docker Engine e il plugin `docker compose` v2.24 o successivo (`docker compose version`).
 - Le porte 80 e 443 libere sull'host: le prende il WAF.
 - Il certificato e la chiave HTTPS dei tuoi domini, gli stessi che usa già il tuo nginx.
-- Per la build: questa cartella dentro il repository `nginx_aws_waf`, perché la build usa i file
-  della root. Sul server di destinazione, invece, basta l'immagine già costruita
-  ([sezione 12](#12-installazione-su-una-macchina-senza-internet)).
+- L'immagine del WAF è pubblicata su GitHub Container Registry: `ghcr.io/manprint/nginx-aws-waf/aio`
+  ([sezione 15](#15-immagini-pubblicate)). `docker compose up` la scarica da solo; serve il
+  repository solo per costruirla in locale (`--build`), perché la build usa i file della root.
 
 ## 2. Contenuto della cartella
 
@@ -77,7 +78,7 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 365 -subj /CN=app.interno.local 
   -keyout certs/app/privkey.pem -out certs/app/fullchain.pem
 chmod 644 certs/app/*.pem
 
-docker compose up -d --build        # la prima build richiede circa 1 minuto
+docker compose up -d                # scarica l'immagine del WAF (con --build la costruisce in locale)
 docker compose ps                   # waf deve risultare "healthy"
 ```
 
@@ -397,7 +398,8 @@ Altri comandi utili:
 docker compose logs -f waf                 # errori di config e reload
 docker compose exec waf nginx -T -c /etc/waf/runtime/current/nginx/nginx.conf | less   # config nginx generata
 docker compose pull nginx && docker compose up -d                                       # aggiorna il tuo nginx
-docker compose build waf && docker compose up -d                                        # aggiorna il WAF
+docker compose pull waf && docker compose up -d                                         # aggiorna il WAF (immagine pubblicata)
+docker compose build waf && docker compose up -d                                        # oppure: ricostruisci dal repository
 ```
 
 **Bloccare IP a mano:** scrivili, uno per riga (IP o CIDR), in
@@ -445,9 +447,8 @@ Sul PC con il repository e accesso a internet:
 
 ```sh
 cd deploy-waf
-docker compose build
-docker pull timberio/vector:0.62.0-alpine
-docker save nginx-aws-waf/aio:latest timberio/vector:0.62.0-alpine | gzip > waf-images.tar.gz
+docker compose pull waf metrics      # oppure: docker compose build
+docker save ghcr.io/manprint/nginx-aws-waf/aio:latest timberio/vector:0.62.0-alpine | gzip > waf-images.tar.gz
 tar czf deploy-waf.tar.gz --exclude='logs/*.log*' --exclude='data/*/*' ../deploy-waf
 ```
 
@@ -461,8 +462,9 @@ cp .env.example .env && vi .env
 docker compose up -d --no-build
 ```
 
-Le liste IP di reputazione sono quelle copiate nell'immagine al momento della build. Per averle
-aggiornate, ricostruisci l'immagine con `docker compose build --build-arg FETCH_LISTS=1`.
+Le liste IP di reputazione sono quelle copiate nell'immagine al momento della build (l'immagine
+pubblicata le scarica a ogni build). Con una build locale, per averle aggiornate:
+`docker compose build --build-arg FETCH_LISTS=1`.
 
 ## 13. Problemi comuni
 
@@ -482,7 +484,7 @@ aggiornate, ricostruisci l'immagine con `docker compose build --build-arg FETCH_
 
 ## 14. Come funziona dentro
 
-- L'immagine `nginx-aws-waf/aio` contiene nginx con libmodsecurity v3, il catalogo delle regole
+- L'immagine `ghcr.io/manprint/nginx-aws-waf/aio` contiene nginx con libmodsecurity v3, il catalogo delle regole
   (`../waf/catalog/rules.yaml`), i profili, le liste IP e `wafctl`.
 - All'avvio, e ogni `WAF_WATCH_INTERVAL` secondi, il container:
   1. costruisce la configurazione da `.env` e `config/`;
@@ -498,3 +500,33 @@ aggiornate, ricostruisci l'immagine con `docker compose build --build-arg FETCH_
   ricava le metriche.
 - Il formato degli eventi e i nomi di regole e label sono gli stessi di AWS WAF: un sito provato
   qui si può esportare come web ACL AWS (`../docs/aws-export.md`).
+
+## 15. Immagini pubblicate
+
+Il workflow `.github/workflows/images.yml` costruisce e pubblica su `ghcr.io` (amd64 e arm64):
+
+| Immagine | Dockerfile | Usata da |
+|---|---|---|
+| `ghcr.io/manprint/nginx-aws-waf/aio` | `deploy-waf/Dockerfile` | `deploy-waf/`, `deploy-waf-for-odoo/` |
+| `ghcr.io/manprint/nginx-aws-waf/waf` | `waf/Dockerfile` | `deploy/compose/node.yml` |
+| `ghcr.io/manprint/nginx-aws-waf/nikto` | `lab/nikto/Dockerfile` | `deploy/compose/lab-tools.yml` |
+
+Tag:
+
+| Tag | Quando |
+|---|---|
+| `latest` | ogni push su `main` e ogni rilascio |
+| `<sha8>` (es. `937d746a`) | ogni build: i primi 8 caratteri del commit |
+| `vX.Y.Z` | push di un tag git `vX.Y.Z` (`git tag v1.0.0 && git push origin v1.0.0`) |
+
+I riferimenti nel repository usano `latest`. In produzione conviene fissare una versione nel `.env`:
+
+```sh
+WAF_IMAGE=ghcr.io/manprint/nginx-aws-waf/aio:v1.0.0
+```
+
+`wafctl version` dentro il container mostra la versione (`vX.Y.Z` o `sha8`).
+
+Se il pacchetto su GitHub è privato serve `docker login ghcr.io` (utente GitHub + token con
+`read:packages`); per renderlo pubblico: GitHub ▸ Packages ▸ impostazioni del pacchetto ▸ *Change
+visibility*.

@@ -1,7 +1,8 @@
 # nginx + ModSecurity + catalogo AWS WAF in un'unica immagine "all-in-one" (nodo singolo, senza centrale).
 # Build dalla root del repo:
-#   docker build -f deploy-waf/Dockerfile -t nginx-aws-waf/aio:latest .
+#   docker build -f deploy-waf/Dockerfile -t ghcr.io/manprint/nginx-aws-waf/aio:latest .
 # oppure: cd deploy-waf && docker compose build
+# Immagine pubblicata (workflow .github/workflows/images.yml): ghcr.io/manprint/nginx-aws-waf/aio:latest | :vX.Y.Z | :<sha8>
 #
 # La config nginx/ModSecurity NON è nell'immagine: all'avvio (e a ogni modifica di /config)
 # il container la renderizza con wafctl da node.yaml + sites/*.yaml (o dalle variabili d'ambiente).
@@ -10,13 +11,15 @@ ARG CRS_IMAGE=owasp/modsecurity-crs:4.30.0-nginx-alpine-202611190211
 ARG GO_IMAGE=golang:1.27-alpine
 
 # ---------- 1. wafctl (Go, statico) ----------
-FROM ${GO_IMAGE} AS wafctl
+# gira sull'architettura della macchina di build e compila per quella di destinazione (multi-arch senza emulazione)
+FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS wafctl
+ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY wafctl/go.mod wafctl/go.sum ./
 RUN go mod download
 COPY wafctl/ ./
 ARG WAF_VERSION=aio
-RUN CGO_ENABLED=0 go build -trimpath \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -trimpath \
       -ldflags "-s -w -X nginxawswaf/wafctl/internal/version.Version=${WAF_VERSION}" \
       -o /out/wafctl ./cmd/wafctl
 

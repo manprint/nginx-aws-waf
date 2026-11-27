@@ -5,7 +5,7 @@ services:
     build:
       context: ../..
       dockerfile: waf/Dockerfile
-    image: nginx-aws-waf/waf:${WAF_VERSION:-dev}
+    image: ghcr.io/manprint/nginx-aws-waf/waf:${WAF_VERSION:-latest}
     restart: unless-stopped
     tmpfs: [/tmp]
     ulimits:

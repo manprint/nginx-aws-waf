@@ -9,7 +9,7 @@ modsec_only=0
 if [[ "${1:-}" == "--modsec-only" ]]; then modsec_only=1; shift; fi
 dir="$(cd "${1:?usage: ngx-test.sh [--modsec-only] <runtime-dir>}" && pwd)"
 rev="$(basename "$dir")"
-img="${WAF_IMAGE:-nginx-aws-waf/waf:dev}"
+img="${WAF_IMAGE:-ghcr.io/manprint/nginx-aws-waf/waf:latest}"
 docker image inspect "$img" >/dev/null 2>&1 || img="owasp/modsecurity-crs:4.30.0-nginx-alpine-202611190211"
 lists="${WAF_DATA_DIR:-$here/.run}/lists"
 [[ -d "$lists" ]] || { echo "missing $lists (run: make lists)" >&2; exit 2; }

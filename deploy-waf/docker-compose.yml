@@ -12,7 +12,7 @@ services:
   # Unico servizio esposto su 80/443. Ispeziona ogni richiesta e passa quelle pulite a nginx.
   # Il nome "waf" non va cambiato (lo usa la raccolta metriche).
   waf:
-    image: ${WAF_IMAGE:-nginx-aws-waf/aio:latest}
+    image: ${WAF_IMAGE:-ghcr.io/manprint/nginx-aws-waf/aio:latest}
     build:
       context: ..
       dockerfile: deploy-waf/Dockerfile
