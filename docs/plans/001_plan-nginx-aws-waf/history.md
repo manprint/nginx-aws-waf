@@ -514,3 +514,6 @@ Notes:
   - Its repeated `PEV-Result: complete` trailer does not denote a second closure.
 - **Note on history.md:** the two G-U32/G-U33 evidence lines of the 3.2/3.3 entries were rewritten in place by that commit. The original text named TestTX1_/TestTX2_ and "TestQ3_ (×2)", and is visible with `git show 9c43de8`.
 - Git history is not rewritten.
+
+## 27-11-2026 P5/2 complete (commit below)
+Gates: G-P5 (amended): make test-unit ok; lab-up ok; pki-isolation.sh ALL PASS; multinode.sh ALL PASS; bootstrap.sh ALL PASS; tf-validate Success; G-SEC empty (tree + history). Review: agent-1:opus — V001-C1 meets its local contract (guard + isolation + doc), no regressions in phase 5. Changes: plan records only.
