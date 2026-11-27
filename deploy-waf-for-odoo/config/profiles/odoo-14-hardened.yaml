@@ -1,0 +1,24 @@
+# Profilo locale: odoo-14 + blocco delle funzioni di gestione dei database di Odoo.
+# Le pagine /web/database/* (manager, create, duplicate, drop, backup, restore, change_password,
+# list, selector) e il servizio XML-RPC "db" permettono, con la master password, di creare,
+# copiare, scaricare o cancellare interi database: dall'esterno non devono essere raggiungibili.
+#
+# Le regole sono in slot "start": vengono valutate prima dei gruppi AWS, come regole custom con
+# priorità bassa in una Web ACL. Il percorso viene decodificato (%2F, %64...) e messo in minuscolo
+# prima del confronto, e le barre doppie sono accettate: /web//Database/%6Danager è bloccato.
+#
+# Per lasciare l'accesso da un IP di amministrazione aggiungi a ogni regola la condizione:
+#   - {ip_set: ["203.0.113.10/32"], negate: true}
+version: 1
+name: odoo-14-hardened
+description: "odoo-14 + database manager (/web/database/*) and XML-RPC db service blocked"
+extends: odoo-14
+custom_rules:
+  - name: OdooBlockDatabaseManager
+    slot: start
+    action: block
+    match: {all: [{uri_path: {regex: "^/+web/+database(/|$)", transform: [urlDecodeUni, lowercase]}}]}
+  - name: OdooBlockXmlrpcDb
+    slot: start
+    action: block
+    match: {all: [{uri_path: {regex: "^/+xmlrpc/+(2/+)?db/*$", transform: [urlDecodeUni, lowercase]}}]}

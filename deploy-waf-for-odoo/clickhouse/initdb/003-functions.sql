@@ -11,6 +11,8 @@ CREATE OR REPLACE FUNCTION waf_causa AS (rule_name, terminating_type) -> multiIf
     rule_name = 'AnonymousIPList',                       'IP anonimo (Tor, VPN, proxy)',
     rule_name = 'HostingProviderIPList',                 'IP di un provider cloud/hosting (probabile bot)',
     rule_name = 'GeoBlock',                              'Paese bloccato (geo_block)',
+    rule_name = 'OdooBlockDatabaseManager',              'Gestione database Odoo (/web/database/*) non consentita',
+    rule_name = 'OdooBlockXmlrpcDb',                     'Servizio XML-RPC db di Odoo (crea/copia/cancella database) non consentito',
     rule_name LIKE 'NoUserAgent%',                       'Header User-Agent mancante',
     rule_name LIKE 'UserAgent_BadBots%',                 'User-Agent di bot o scanner malevolo',
     rule_name ILIKE '%SizeRestrictions%' OR rule_name ILIKE '%BodySize%', 'Richiesta troppo grande (limite di dimensione)',

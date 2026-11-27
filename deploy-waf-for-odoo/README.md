@@ -91,6 +91,35 @@ Nota su `localhost`: la regola AWS `Host_localhost_HEADER` blocca le richieste c
 `Host: localhost`. Solo in questo stack locale l'ho messa in count in `odoo.yaml`, altrimenti
 http://localhost darebbe 403. In produzione quell'override va tolto.
 
+**Profilo `odoo-14-hardened`** (`config/profiles/odoo-14-hardened.yaml`): il sito usa `odoo-14`
+più due regole che bloccano la gestione dei database di Odoo, cioè le funzioni che con la master
+password creano, copiano, scaricano o cancellano un database:
+
+| Regola | Blocca |
+|---|---|
+| `OdooBlockDatabaseManager` | `/web/database/*`: manager, selector, list, create, duplicate, drop, backup, restore, change_password |
+| `OdooBlockXmlrpcDb` | `/xmlrpc/db` e `/xmlrpc/2/db`, il servizio XML-RPC `db` (stesse operazioni via API) |
+
+Il percorso viene decodificato e messo in minuscolo prima del confronto: varianti come
+`/Web//Database/%6Danager` sono bloccate.
+
+Tutto si configura in `config/sites/odoo.yaml`, senza toccare i profili (in fondo al file ci sono
+gli esempi commentati), e viene applicato entro 10 secondi:
+
+| Voglio | In `odoo.yaml` |
+|---|---|
+| disattivare una regola custom ereditata | `disable_custom_rules: [OdooBlockXmlrpcDb]` |
+| ridefinirla (es. solo da un IP admin, o in count) | `custom_rules:` con lo **stesso nome** |
+| cambiare l'azione di una regola AWS | `rule_groups[].rule_action_overrides` |
+| cambiarla solo su un percorso | `path_overrides` |
+| tornare al profilo standard | `profile: odoo-14` |
+
+`docker compose exec waf wafctl explain odoo` mostra le regole attive, con azione e origine
+(profilo o sito). Nota: `OdooXssBodyOutsideEditor` (profilo `odoo-common`) blocca anche l'API
+XML-RPC (`/xmlrpc/2/common`, `/xmlrpc/2/object`), perché il body XML sembra XSS; se usi
+integrazioni XML-RPC, disattivala oppure ridefiniscila aggiungendo `xmlrpc/` ai percorsi esclusi
+della sua regex (la regola scatta sulla label, che c'è anche quando la regola AWS è in count).
+
 **Rate limit**: in `odoo.yaml` c'è, commentato, un limite per IP come le rate-based rule di AWS
 (2000 richieste in 5 minuti). Il limite è per IP: dietro un NAT aziendale tutti gli utenti
 condividono lo stesso IP, quindi va dimensionato su quello.

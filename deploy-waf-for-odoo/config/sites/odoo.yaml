@@ -3,7 +3,7 @@ version: 1
 site_id: odoo
 server_names: [odoo.localhost, localhost, 127.0.0.1]
 app: odoo                       # aggiunge la location realtime e la classificazione delle richieste Odoo
-profile: odoo-14                # aws-default + RPC/editor di Odoo (body grandi, HTML) in count
+profile: odoo-14-hardened       # odoo-14 (RPC/editor in count) + blocco di /web/database/* e XML-RPC db (config/profiles/)
 upstream:
   servers: ["nginx:80"]
   realtime: {path: /longpolling, servers: ["nginx:80"]}   # Odoo 14: longpolling (timeout lungo)
@@ -18,3 +18,30 @@ rule_groups:
 # Rate limit per IP (come una rate-based rule AWS): oltre 2000 richieste in 5 minuti → 403.
 # Visibile in Grafana ▸ WAF Traffic overview ▸ Rate limit.
 # rate_limit: {limit: 2000, window_sec: 300, action: block}
+
+# ---- Regole Odoo: tutto configurabile da qui, senza toccare i profili ----------------------
+# Regole custom ereditate dai profili (wafctl explain odoo le elenca tutte, con l'origine):
+#   OdooBlockDatabaseManager  blocca /web/database/*            (profilo odoo-14-hardened)
+#   OdooBlockXmlrpcDb         blocca XML-RPC /xmlrpc/(2/)db      (profilo odoo-14-hardened)
+#   OdooXssBodyOutsideEditor  body "XSS" fuori dall'editor → 403 (profilo odoo-common): blocca
+#                             anche l'API XML-RPC (/xmlrpc/2/common, /xmlrpc/2/object)
+#   OdooBodySizeOutsideRpc, OdooRfiBodyOutsideRpc                (profilo odoo-common)
+#
+# Disattivarne una o più:
+# disable_custom_rules: [OdooXssBodyOutsideEditor]
+#
+# Ridefinirne una (stesso nome = sostituisce quella del profilo). Es.: database manager
+# consentito solo dall'IP di amministrazione, oppure "action: count" per solo log:
+# custom_rules:
+#   - name: OdooBlockDatabaseManager
+#     slot: start
+#     action: block
+#     match: {all: [{uri_path: {regex: "^/+web/+database(/|$)", transform: [urlDecodeUni, lowercase]}},
+#                   {ip_set: ["203.0.113.10/32"], negate: true}]}
+#
+# Cambiare l'azione di una regola AWS (count | block | allow) per tutto il sito o per un percorso:
+# rule_groups:
+#   - name: AWSManagedRulesCommonRuleSet
+#     rule_action_overrides: {SizeRestrictions_BODY: count}
+# path_overrides:
+#   - {path_prefix: /web/content/, rules: {RestrictedExtensions_URIPATH: count}}
