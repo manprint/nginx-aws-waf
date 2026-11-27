@@ -1,8 +1,8 @@
 package logs
 
 import (
-	"encoding/json"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"

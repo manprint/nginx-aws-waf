@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -62,24 +63,32 @@ func (r *Raw) Query(ctx context.Context, sql string, params map[string]string, o
 		args = append(args, "--param_"+k+"="+p)
 	}
 	stdin := []byte(pre + strings.TrimRight(strings.TrimSpace(sql), ";") + ";\n")
-	run := r.Run
-	if run == nil {
-		run = dockerRun
+	if r.Run != nil {
+		b, err := r.Run(ctx, args, stdin)
+		if err != nil {
+			return err
+		}
+		return decodeLines(bytes.NewReader(b), out)
 	}
-	b, err := run(ctx, args, stdin)
+	// stream stdout (export never buffers the whole result)
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd.Stdin = bytes.NewReader(stdin)
+	var errb bytes.Buffer
+	cmd.Stderr = &errb
+	pipe, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	return decodeLines(bytes.NewReader(b), out)
-}
-
-func dockerRun(ctx context.Context, args []string, stdin []byte) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "docker", args...)
-	cmd.Stdin = bytes.NewReader(stdin)
-	var out, errb bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &errb
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("clickhouse local: %v: %s", err, bytes.TrimSpace(errb.Bytes()))
+	if err := cmd.Start(); err != nil {
+		return err
 	}
-	return out.Bytes(), nil
+	derr := decodeLines(pipe, out)
+	if derr != nil {
+		_ = cmd.Process.Kill()
+		_, _ = io.Copy(io.Discard, pipe)
+	}
+	if werr := cmd.Wait(); werr != nil && derr == nil {
+		return fmt.Errorf("clickhouse local: %v: %s", werr, bytes.TrimSpace(errb.Bytes()))
+	}
+	return derr
 }

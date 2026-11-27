@@ -1,0 +1,66 @@
+{
+  "timestamp": 1795773600123,
+  "formatVersion": 1,
+  "webaclId": "nginx-aws-waf:n1:demo",
+  "terminatingRuleId": "SizeRestrictions_BODY",
+  "terminatingRuleType": "MANAGED_RULE_GROUP",
+  "action": "BLOCK",
+  "terminatingRuleMatchDetails": [],
+  "httpSourceName": "ALB",
+  "httpSourceId": "demo",
+  "ruleGroupList": [
+    {
+      "ruleGroupId": "AWS#AWSManagedRulesCommonRuleSet",
+      "terminatingRule": {
+        "ruleId": "SizeRestrictions_BODY",
+        "action": "BLOCK"
+      },
+      "nonTerminatingMatchingRules": [
+        {
+          "ruleId": "NoUserAgent_HEADER",
+          "action": "COUNT"
+        }
+      ],
+      "excludedRules": null
+    },
+    {
+      "ruleGroupId": "AWS#AWSManagedRulesKnownBadInputsRuleSet",
+      "terminatingRule": null,
+      "nonTerminatingMatchingRules": [
+        {
+          "ruleId": "Log4JRCE_BODY",
+          "action": "COUNT"
+        }
+      ],
+      "excludedRules": null
+    }
+  ],
+  "rateBasedRuleList": [],
+  "nonTerminatingMatchingRules": [],
+  "requestHeadersInserted": null,
+  "responseCodeSent": 403,
+  "httpRequest": {
+    "clientIp": "2001:db8::1",
+    "country": "GB",
+    "headers": [
+      {
+        "name": "Host",
+        "value": "demo.lab.test"
+      },
+      {
+        "name": "User-Agent",
+        "value": "x"
+      }
+    ],
+    "uri": "/api",
+    "args": "a=1",
+    "httpVersion": "HTTP/1.1",
+    "httpMethod": "POST",
+    "requestId": "rid1"
+  },
+  "labels": [
+    {
+      "name": "awswaf:managed:aws:core-rule-set:SizeRestrictions_Body"
+    }
+  ]
+}

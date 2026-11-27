@@ -11,8 +11,8 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Scope: plan 001 · RUNNING · overrides none
 - Unit: none
 - Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
-- Last closure: unit:3.2:1
-- Next: open 3.3 · next eligible: 3.3
+- Last closure: unit:3.3:1
+- Next: open 3.4 · next eligible: 3.4
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -133,7 +133,7 @@ Phase 3 (expanded):
 |----|---------|--------|---------|----------|------------|
 | 3.1 | P1 | DONE | 1 | agent-1 | unit:3.1:1 |
 | 3.2 | 3.1 | DONE | 1 | agent-1 | unit:3.2:1 |
-| 3.3 | 3.2 | TODO | 1 | agent-1 | |
+| 3.3 | 3.2 | DONE | 1 | agent-1 | unit:3.3:1 |
 | 3.4 | 3.3 | TODO | 1 | agent-1 | |
 | 3.5 | 3.4 | TODO | 1 | agent-1 | |
 | 3.6 | 3.5 | TODO | 1 | agent-1 | |

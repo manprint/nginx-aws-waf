@@ -22,6 +22,7 @@ const logsUsage = `usage: wafctl logs <command>
   search [filters] [--format table|json] [--raw DIR]
   show <request_id> [--format table|json] [--raw DIR]
   tail [filters] [--format table|json] [--interval 2s]
+  export [filters] --format jsonl|csv|aws [--with-matches] [--gzip] -o FILE|- [--raw DIR]
   rotate [--max-size 512MiB] [--keep-hours 24] [--raw-days 7]
 filters: --site S (repeatable) --since 1h | --from RFC3339 [--to RFC3339] --action ALLOW|BLOCK|FAIL
          --shadow BLOCK --rule NAME [--matched] --ip IP --country CC --path-prefix P --user-class C
@@ -36,6 +37,8 @@ func cmdLogs(args []string) int {
 		return cmdLogsQuery(args[0], args[1:])
 	case "show":
 		return cmdLogsShow(args[1:])
+	case "export":
+		return cmdLogsExport(args[1:])
 	case "rotate":
 	default:
 		return fail("%s", logsUsage)
@@ -148,5 +151,47 @@ func cmdLogsShow(args []string) int {
 	if err := logs.Show(context.Background(), querier(*raw), rid, *format, os.Stdout); err != nil {
 		return fail("%v", err)
 	}
+	return 0
+}
+
+func cmdLogsExport(args []string) int {
+	fs := flag.NewFlagSet("logs export", flag.ContinueOnError)
+	ff := logs.AddFilterFlags(fs, "1h", 100000)
+	format := fs.String("format", "jsonl", "jsonl|csv|aws")
+	withMatches := fs.Bool("with-matches", false, "jsonl: add the matches array to each event")
+	gz := fs.Bool("gzip", false, "gzip the output")
+	out := fs.String("o", "", "output file (- = stdout)")
+	raw := fs.String("raw", "", "query raw JSONL under DIR offline")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	f, err := ff.Finish(time.Now())
+	if err != nil {
+		return fail("%v", err)
+	}
+	if *out == "" {
+		return fail("logs export: -o FILE or -o - is required")
+	}
+	if *format != "jsonl" && *format != "csv" && *format != "aws" {
+		return fail("--format %q not in jsonl|csv|aws", *format)
+	}
+	w := os.Stdout
+	if *out != "-" {
+		if w, err = os.Create(*out); err != nil {
+			return fail("%v", err)
+		}
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	n, err := logs.Export(ctx, querier(*raw), f, *format, *withMatches, *gz, w)
+	if *out != "-" {
+		if cerr := w.Close(); err == nil {
+			err = cerr
+		}
+	}
+	if err != nil {
+		return fail("%v", err)
+	}
+	fmt.Fprintf(os.Stderr, "exported %d events (%s, %s .. %s)\n", n, *format, f.From.Format(time.RFC3339), f.To.Format(time.RFC3339))
 	return 0
 }

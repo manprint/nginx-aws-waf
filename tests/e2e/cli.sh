@@ -27,4 +27,17 @@ sleep 6
 a=$("$W" logs search --from "$from" --to "$to" --format json --limit 100000 | jq length)
 b=$("$W" logs search --from "$from" --to "$to" --format json --limit 100000 --raw "$RAW" | jq length)
 check "T-Q5-raw-same-count ($a = $b)" test "$a" = "$b"
+
+# --- 3.3 logs export (G-U33)
+x=$(mktemp); "$W" logs export --from "$from" --to "$to" --format aws -o "$x" 2>/dev/null
+ok=$(jq -e .httpRequest.requestId "$x" >/dev/null && echo 1 || echo 0); xn=$(wc -l < "$x")
+check "X-aws-lines-parse" test "$ok" = 1
+check "X-aws-count-eq-search ($xn = $a)" test "$xn" = "$a"
+check "X-aws-terminating-group" grep -q '"terminatingRule":{"ruleId":"NoUserAgent_HEADER","action":"BLOCK"}' "$x"
+"$W" logs export --from "$from" --to "$to" --format csv -o "$x" 2>/dev/null; cn=$(( $(wc -l < "$x") - 1 ))
+check "X-csv-count ($cn = $a)" test "$cn" = "$a"
+"$W" logs export --from "$from" --to "$to" --format jsonl --with-matches --gzip -o "$x" 2>/dev/null
+jm=$(zcat "$x" | jq -s '[.[] | select(.match_count > 0 and (.matches|length) > 0)] | length')
+check "X-jsonl-with-matches ($jm)" test "${jm:-0}" -gt 0
+rm -f "$x"
 finish
