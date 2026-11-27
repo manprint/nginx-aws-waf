@@ -46,6 +46,8 @@ Il modo normale resta correggere la config (git revert nel repo del nodo) e rifa
 | `wafctl-logs.timer` / `.service` | ogni ora | `wafctl logs rotate` |
 | `wafctl-node-renew.timer` / `.service` | ogni giorno (+ fino a 1 h casuale) | `wafctl node renew`: rinnova il certificato del nodo se mancano meno di 30 giorni (ruolo node) |
 | `wafctl-pki-crl.timer` / `.service` | ogni giorno | `wafctl pki crl`: rigenera la CRL (vale 7 giorni) e ricarica l'ingress (centrale) |
+| `wafctl-lists.timer` / `.service` | ogni giorno alle 04:17 UTC (+ fino a 30 min casuali) | `wafctl lists update`: aggiorna le liste IP e fa apply se sono cambiate (ruoli node e all-in-one) |
+| `wafctl-geoip.timer` / `.service` | ogni settimana (mercoledì) | `geoipupdate` in Docker (GeoLite2-Country e ASN), poi `wafctl apply`. Va abilitato a mano: serve un account MaxMind |
 | `wafctl-pki.service` | sempre attivo | `wafctl pki serve --addr :6001`: API di enrollment/rinnovo (centrale) |
 
 Installazione: `wafctl node bootstrap ... --install-systemd` copia le unit e abilita quelle del
@@ -125,8 +127,45 @@ aggregate (400 giorni) sono piccole. Dettagli in [observability.md](observabilit
 
 Le liste usate dalle regole di reputazione stanno in `$WAF_DATA_DIR/lists/*.txt` (montate in
 `/etc/waf/lists`). Nel lab `make lists` le copia da `data/ip-reputation/` (`make fetch` le scarica).
-L'aggiornamento automatico (`wafctl lists`) arriva nella fase 6 (unità 6.4); dopo un cambio delle
-liste serve un reload (`wafctl apply`).
+
+```bash
+wafctl lists update            # scarica, controlla, installa, fa apply se qualcosa è cambiato
+wafctl lists update --force    # accetta anche una lista molto più corta di quella attuale
+wafctl lists update --no-apply # installa senza apply
+```
+
+Passi di `wafctl lists update`:
+
+1. Esegue `$WAF_HOME/scripts/fetch-ip-lists.sh` con `OUT=<dir temporanea>`.
+2. Controlla ogni riga di ogni lista, che deve essere un IP o un CIDR. Se una riga non è valida,
+   si ferma con `file:riga` e non sostituisce nessuna lista.
+3. Applica la protezione contro i download falliti. Lo script scrive un file vuoto se il download
+   fallisce. Se la lista nuova ha meno del 50 % delle voci di quella attuale, viene tenuta quella
+   attuale (stato `kept`). Senza rete tutte le liste risultano `kept` e il comando esce con 0.
+4. Installa le liste cambiate con un file temporaneo e un rename.
+5. Fa `wafctl apply`: il reload rilegge `@ipMatchFromFile`.
+
+Il comando stampa una tabella `LIST OLD NEW STATUS`. Lo stato è uno di `updated`, `unchanged`,
+`kept`, `new`. Le liste gestite sono `AWSManagedIPReputationList`, `AWSManagedReconnaissanceList`,
+`AWSManagedIPDDoSList` e `AnonymousIPList`. `custom-reputation.txt` è dell'operatore e non viene
+mai toccata. Se `custom-reputation.txt` o `HostingProviderIPList.txt` mancano (nodo nuovo), il
+comando li crea con solo un commento (stato `created`), perché le regole li referenziano e senza i
+file `nginx -t` fallisce. Dopo non li modifica più.
+
+### GeoIP
+
+Le regole `geo` e `geo_block` richiedono `geoip.enabled: true` in `node.yaml` e i database in
+`$WAF_DATA_DIR/geoip/`. Nel lab `make geoip-test` usa i database di test di MaxMind. In
+produzione servono un account MaxMind GeoLite2 (gratuito) e due righe in
+`$WAF_CONFIG_DIR/secrets.env`:
+
+```bash
+GEOIPUPDATE_ACCOUNT_ID=123456
+GEOIPUPDATE_LICENSE_KEY=...
+```
+
+Poi abilita il timer con `systemctl enable --now wafctl-geoip.timer`. Il servizio esegue
+`maxmindinc/geoipupdate:v8.0.0` con le edizioni `GeoLite2-Country GeoLite2-ASN`, poi `wafctl apply`.
 
 ## Benchmark
 

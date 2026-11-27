@@ -28,6 +28,7 @@ var commands = map[string]func([]string) int{
 	"pki":        cmdPKI,
 	"node":       cmdNode,
 	"export-aws": cmdExportAWS,
+	"lists":      cmdLists,
 }
 
 func usage() {

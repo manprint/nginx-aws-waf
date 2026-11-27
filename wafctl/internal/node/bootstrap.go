@@ -34,9 +34,9 @@ var reNodeID = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 // Timers enabled per role by --install-systemd (units from $WAF_HOME/deploy/systemd).
 var Timers = map[string][]string{
-	"node":       {"wafctl-bypass-expire.timer", "wafctl-logs.timer", "wafctl-node-renew.timer"},
+	"node":       {"wafctl-bypass-expire.timer", "wafctl-logs.timer", "wafctl-node-renew.timer", "wafctl-lists.timer"},
 	"central":    {"wafctl-pki-crl.timer", "wafctl-pki.service"},
-	"all-in-one": {"wafctl-bypass-expire.timer", "wafctl-logs.timer", "wafctl-pki-crl.timer", "wafctl-pki.service"},
+	"all-in-one": {"wafctl-bypass-expire.timer", "wafctl-logs.timer", "wafctl-pki-crl.timer", "wafctl-pki.service", "wafctl-lists.timer"},
 }
 
 // DataSubdirs are created under $WAF_DATA_DIR (certs/_node is 0700).
@@ -221,7 +221,7 @@ func (o *BootstrapOptions) nextSteps() string {
 		p("wafctl pki init --name <name>   (then keep an offline copy of %s/pki/private)", o.ConfigDir)
 		p("edit central.yaml (ingress.server_names) and apprise-urls.txt")
 	}
-	p("%s/scripts/fetch-ip-lists.sh && cp %s/data/ip-reputation/*.txt %s/lists/   (IP reputation lists; daily cron)", o.Home, o.Home, o.DataDir)
+	p("wafctl lists update   (IP reputation lists into %s/lists; daily via wafctl-lists.timer)", o.DataDir)
 	p("add sites/<site_id>.yaml, then: wafctl validate && wafctl apply")
 	if o.Role == "node" {
 		p("on the central: wafctl pki token --cn %s ; here: wafctl node enroll --token <T> --ca-sha256 <H>", o.NodeID)

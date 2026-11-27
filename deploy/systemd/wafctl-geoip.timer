@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly MaxMind GeoLite2 update (enable only with a MaxMind account in secrets.env)
+
+[Timer]
+OnCalendar=Wed *-*-* 05:23:00
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

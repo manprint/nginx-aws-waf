@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh the WAF IP reputation lists and reload when they change (wafctl lists update)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/wafctl
+ExecStart=/usr/local/bin/wafctl lists update

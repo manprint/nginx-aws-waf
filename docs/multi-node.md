@@ -176,15 +176,16 @@ wafctl node bootstrap --node-id web-7 --role node --central central.example.com 
    `node.yaml`, `sites/` e `profiles/`; per i ruoli centrali anche `central.yaml`.
 2. Genera `secrets.env` (0600) e crea le directory in `$WAF_DATA_DIR` (default `/srv/waf`).
 3. Con `--install-systemd`, installa i timer del ruolo:
-   - node: bypass-expire, logs, node-renew;
+   - node: bypass-expire, logs, node-renew, lists;
    - central: pki-crl, pki;
-   - all-in-one: tutti tranne node-renew.
+   - all-in-one: tutti tranne node-renew (compreso lists).
+
+   `wafctl-geoip.timer` va abilitato a mano, perché serve un account MaxMind ([operations.md](operations.md#geoip)).
 4. Fa il primo commit `bootstrap <id>`.
 
 Poi:
 
-1. Scarica le liste IP: `scripts/fetch-ip-lists.sh`, poi copia `data/ip-reputation/*.txt` in
-   `$WAF_DATA_DIR/lists/`.
+1. Scarica le liste IP con `wafctl lists update --no-apply`. Le installa in `$WAF_DATA_DIR/lists/`.
 2. Aggiungi i siti in `sites/`, poi esegui `wafctl validate && wafctl apply`.
 3. Esegui l'enrollment (vedi sopra).
 4. Fai commit delle modifiche.

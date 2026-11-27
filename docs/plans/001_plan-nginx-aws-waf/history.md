@@ -384,3 +384,24 @@
   - NEW TestR15_. New corpus cases allowlist-ipset-v4 and allowlist-ipset-v6 (OfficeAllow wins over IpReputation: first-wins).
 - G-U63: TestTF1–3 3 PASS. `tf-validate-export.sh build/aws/shop18.tf` → VALID; tuned.tf and allowlist.tf (IP sets v4+v6) → VALID. The rated, tunedaws, shadowed and methods fixtures → VALID.
 - Regression: corpus PASSED 67/67, make test-unit 0 FAIL, aws-export-check all VALID.
+
+## 6.4 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- WRITE scripts/fetch-ip-lists.sh: `OUT="${OUT:-$ROOT/data/ip-reputation}"` (a one-line diff).
+- NEW wafctl/internal/lists/update.go, `Update`. Order of work:
+  1. Fetch into a tmpdir.
+  2. Validate every line of every list with netip; an error names `file:line` and nothing is installed.
+  3. Apply the 50 % guard (`kept` unless --force). Content is compared on entries only, so the timestamp header is ignored.
+  4. Install through tmp + rename.
+  5. Print the `LIST OLD NEW STATUS` table.
+  - The managed lists are the 4 the script produces.
+  - **Plan addition (non-weakening):** `custom-reputation.txt` and `HostingProviderIPList.txt` are created comment-only when missing (`created`) and never touched afterwards. The catalog references both through @ipMatchFromFile, so without them nginx -t fails on a new node.
+- NEW cmd/wafctl/lists.go: `wafctl lists update [--force] [--no-apply] [--script]`. It runs apply only when something changed.
+- NEW deploy/systemd/wafctl-lists.{service,timer} (04:17 UTC, RandomizedDelaySec=30m) and wafctl-geoip.{service,timer} (weekly; geoipupdate v8.0.0 tag verified on Docker Hub; then apply). systemd-analyze verify is clean.
+  - The bootstrap Timers for node and all-in-one now include wafctl-lists.timer. The geoip timer is enabled by hand because it needs a MaxMind account.
+  - The bootstrap next-steps text now says `wafctl lists update`.
+- Docs: operations.md has the "Liste IP" and "GeoIP" sections plus the systemd table; multi-node.md updated.
+- G-U64: TestLST1–3 3 PASS.
+  - Online `wafctl lists update` on the lab: table with 3 lists updated, DDoS unchanged, apply ran. The corpus `iprep-*`/`anonip-*` cases pass (67/67).
+  - Offline (`unshare -rn`): 3× kept, rc 0, files untouched, no apply.
+  - A second online run: everything unchanged, apply skipped.
+  - Regression: bootstrap.sh ALL PASS, make test-unit 0 FAIL.
