@@ -1,0 +1,8 @@
+GROUP                                 RULE                   MATCHES  TERMINATING  COUNTED  SITES
+AWSManagedRulesCommonRuleSet          SizeRestrictions_BODY  50       24           26       2
+AWSManagedRulesKnownBadInputsRuleSet  Log4JRCE_HEADER        3        3            0        1
+--
+[
+  {"group": "AWSManagedRulesCommonRuleSet", "rule": "SizeRestrictions_BODY", "matches": 50, "terminating": 24, "counted": 26, "sites": 2},
+  {"group": "AWSManagedRulesKnownBadInputsRuleSet", "rule": "Log4JRCE_HEADER", "matches": 3, "terminating": 3, "counted": 0, "sites": 1}
+]

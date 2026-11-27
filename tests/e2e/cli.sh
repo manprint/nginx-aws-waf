@@ -7,10 +7,8 @@ W="${WAFCTL:-$ROOT/wafctl/bin/wafctl}"
 RAW="${WAF_DATA_DIR:-$ROOT/.run}/raw"
 
 # corpus run, then wait until its events are in ClickHouse
-res=$(mktemp); "$W" test run --suite "$ROOT/tests/corpus" --format json > "$res"
-rid=$(jq -r .run_id "$res"); n=$(jq '.results|length' "$res")
-nblock=$(jq '[.results[] | select(.status == 403 and .mode == "enforce" and (.summary|test("site=demo;")))] | length' "$res")
-rm -f "$res"
+corpus=$("$W" test run --suite "$ROOT/tests/corpus" --format json)
+nblock=$(jq '[.results[] | select(.status == 403 and .mode == "enforce" and (.summary|test("site=demo;")))] | length' <<< "$corpus")
 for ((i=0; i<30; i++)); do
   got=$("$W" logs search --since 15m --format json --limit 100000 --site demo --action BLOCK | jq length)
   (( got >= nblock )) && break; sleep 1
@@ -40,4 +38,15 @@ check "X-csv-count ($cn = $a)" test "$cn" = "$a"
 jm=$(zcat "$x" | jq -s '[.[] | select(.match_count > 0 and (.matches|length) > 0)] | length')
 check "X-jsonl-with-matches ($jm)" test "${jm:-0}" -gt 0
 rm -f "$x"
+
+# --- 3.4 stats (G-U34)
+nua=$("$W" stats --since 15m --by rule --format json --top 1000 | jq '[.[] | select(.rule == "NoUserAgent_HEADER") | .matches] | add // 0')
+check "S-rule-NoUserAgent ($nua)" test "$nua" -ge 1
+nb=$(jq '[.results[] | select(.status == 403 and .mode == "enforce")] | length' <<< "$corpus")
+ob=$("$W" stats --since 15m --format json | jq '.[0].block')
+check "S-overview-block ($ob >= $nb)" test "$ob" -ge "$nb"
+oa=$("$W" stats --since 2h --format json | jq '.[0].requests')
+check "S-overview-agg ($oa >= $a)" test "$oa" -ge "$a"
+cn=$("$W" stats --since 2h --by rule --counted --format json | jq '[.[] | select(.counted != .matches)] | length')
+check "S-counted-only" test "$cn" = 0
 finish
