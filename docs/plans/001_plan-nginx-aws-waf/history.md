@@ -506,3 +506,11 @@ Changes:
 Notes:
 - Gate registry (non-weakening): G-U51 adds TestCRL1_ and pki-isolation.sh; G-P5 adds pki-isolation.sh before multinode.
 - Phase 5 reopened (attempt 2); PLAN back to TODO (attempt 2).
+
+## 27-11-2026 V001-C2/1 complete (commit below)
+- **Note on 3.3/1 (V001-F2):**
+  - The closure commit of 3.3/1 is 925b6c9.
+  - 9c43de8 ("align test names with G-U32/G-U33 regexes") is a follow-up within the same attempt, limited to renaming tests: TestTX[12]_ → TestX[12]_, and a TestQ3_ duplicate → TestQR1_.
+  - Its repeated `PEV-Result: complete` trailer does not denote a second closure.
+- **Note on history.md:** the two G-U32/G-U33 evidence lines of the 3.2/3.3 entries were rewritten in place by that commit. The original text named TestTX1_/TestTX2_ and "TestQ3_ (×2)", and is visible with `git show 9c43de8`.
+- Git history is not rewritten.
