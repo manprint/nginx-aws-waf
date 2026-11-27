@@ -65,7 +65,8 @@ func (r *renderer) meta(rev string) []byte {
 	for _, s := range r.sites {
 		m.Sites = append(m.Sites, s.Eff.Site.SiteID)
 	}
-	b, _ := json.MarshalIndent(m, "", "  ")
+	// Single-line JSON: the node Vector heartbeat reads it with `cat` as one event.
+	b, _ := json.Marshal(m)
 	return append(b, '\n')
 }
 

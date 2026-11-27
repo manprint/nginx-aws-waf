@@ -2,6 +2,7 @@
 package apply
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -148,6 +149,9 @@ func Apply(p *Prepared, eng docker.Engine, runtimeDir string, o Options) (string
 		return rev, nil
 	}
 	cur := filepath.Join(runtimeDir, "current")
+	// node Vector reads runtime/current/vector/forward.yaml only at start: restart it on change
+	prevFwd, _ := os.ReadFile(filepath.Join(cur, "vector", "forward.yaml"))
+	fwdChanged := !bytes.Equal(prevFwd, p.Out.Files["vector/forward.yaml"])
 	_ = os.Remove(cur + ".new")
 	if err := os.Symlink(rev, cur+".new"); err != nil {
 		return "", err
@@ -170,6 +174,14 @@ func Apply(p *Prepared, eng docker.Engine, runtimeDir string, o Options) (string
 				return "", fmt.Errorf("nginx did not load %s within 15s after reload", rev)
 			}
 			time.Sleep(100 * time.Millisecond)
+		}
+		if fwdChanged {
+			if vr, _ := eng.Running("vector"); vr {
+				if err := eng.Restart("vector"); err != nil {
+					return "", fmt.Errorf("vector restart: %v", err)
+				}
+				logf("vector restarted (forward config changed)")
+			}
 		}
 	} else {
 		if err := eng.Up(); err != nil {

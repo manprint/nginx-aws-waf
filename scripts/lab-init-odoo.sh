@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 export WAF_DATA_DIR="${WAF_DATA_DIR:-$ROOT/.run}"
-DC=(docker compose -p waf -f deploy/compose/node.yml -f deploy/compose/node.bridge.yml -f deploy/compose/lab-min.yml -f deploy/compose/lab.yml)
+DC=(docker compose -p waf --env-file "${WAF_CONFIG_DIR:-lab/config}/secrets.env" -f deploy/compose/node.yml -f deploy/compose/node.bridge.yml -f deploy/compose/central.yml -f deploy/compose/central.bridge.yml -f deploy/compose/lab-min.yml -f deploy/compose/lab.yml)
 declare -A PG=([12]=pg12 [14]=pg13 [16]=pg15 [18]=pg16)
 MODULES=contacts,crm,sale_management,website_sale,website_crm
 versions=("$@"); (( ${#versions[@]} )) || versions=(12 14 16 18)

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"nginxawswaf/wafctl/internal/apply"
-	"nginxawswaf/wafctl/internal/docker"
 	"nginxawswaf/wafctl/internal/env"
 	"nginxawswaf/wafctl/internal/render"
 )
@@ -18,11 +17,7 @@ func doApply(dir string, dry bool) int {
 	if rc != 0 {
 		return rc
 	}
-	home, err := env.Home()
-	if err != nil {
-		return fail("%v", err)
-	}
-	eng, err := docker.NewCompose(home, p.Cfg.Node.Network, env.DataDir())
+	eng, err := newEngine(p.Cfg.Node)
 	if err != nil {
 		return fail("%v", err)
 	}

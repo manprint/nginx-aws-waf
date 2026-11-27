@@ -12,5 +12,7 @@ data/ip-reputation/*.txt
 *.pem
 *.key
 /lab/config/state/
+secrets.env
+secrets.env.tmp
 node_modules/
 /tests/legit/test-results/

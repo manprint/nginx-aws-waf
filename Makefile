@@ -21,18 +21,29 @@ export WAF_HOME := $(CURDIR)
 export WAF_CONFIG_DIR ?= $(CURDIR)/lab/config
 export WAF_DATA_DIR ?= $(CURDIR)/.run
 export WAF_COMPOSE_EXTRA ?= deploy/compose/lab-min.yml
-COMPOSE_NODE := docker compose -p waf -f deploy/compose/node.yml -f deploy/compose/node.bridge.yml -f deploy/compose/lab-min.yml
+export WAF_CENTRAL_DIR ?= $(WAF_DATA_DIR)/central
+export WAF_NODE_ID ?= lab-node-1
+# lab node.yaml: role all-in-one, network bridge → node + central compose files (same as wafctl apply)
+COMPOSE_NODE = docker compose -p waf --env-file $(WAF_CONFIG_DIR)/secrets.env -f deploy/compose/node.yml -f deploy/compose/node.bridge.yml -f deploy/compose/central.yml -f deploy/compose/central.bridge.yml -f deploy/compose/lab-min.yml
+
+.PHONY: geoip-test
+geoip-test: ## MaxMind test databases as $(WAF_DATA_DIR)/geoip/GeoLite2-{Country,ASN}.mmdb (lab only)
+	mkdir -p $(WAF_DATA_DIR)/geoip
+	curl -sSfL -o $(WAF_DATA_DIR)/geoip/GeoLite2-Country.mmdb https://github.com/maxmind/MaxMind-DB/raw/main/test-data/GeoIP2-Country-Test.mmdb
+	curl -sSfL -o $(WAF_DATA_DIR)/geoip/GeoLite2-ASN.mmdb https://github.com/maxmind/MaxMind-DB/raw/main/test-data/GeoLite2-ASN-Test.mmdb
 
 .PHONY: lab-min-up lab-min-down
-lab-min-up: wafctl lists ## start the minimal lab (WAF node + echo)
-	mkdir -p .run/runtime .run/logs .run/certs .run/geoip .run/raw .run/vector
+lab-min-up: wafctl lists ## start the minimal lab (WAF node + echo + central ClickHouse/Vector)
+	mkdir -p .run/runtime .run/logs .run/certs .run/geoip .run/raw .run/vector $(WAF_CENTRAL_DIR)/clickhouse $(WAF_CENTRAL_DIR)/vector
+	./wafctl/bin/wafctl secrets init
+	@[ -s $(WAF_DATA_DIR)/geoip/GeoLite2-Country.mmdb ] || $(MAKE) geoip-test
 	./wafctl/bin/wafctl apply
 	$(COMPOSE_NODE) up -d --build --wait
 
 lab-min-down: ## stop the minimal lab
 	$(COMPOSE_NODE) down
 
-COMPOSE_LAB := $(COMPOSE_NODE) -f deploy/compose/lab.yml
+COMPOSE_LAB = $(COMPOSE_NODE) -f deploy/compose/lab.yml
 
 .PHONY: lab-up lab-down lab-reset
 lab-up: export WAF_COMPOSE_EXTRA = deploy/compose/lab-min.yml:deploy/compose/lab.yml

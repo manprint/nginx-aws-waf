@@ -33,6 +33,7 @@ func (f *fakeEngine) Exec(_ string, a ...string) (string, error) {
 func (f *fakeEngine) RunOnce(s string, a ...string) (string, error) { return f.Exec(s, a...) }
 func (f *fakeEngine) Up() error                                     { f.calls = append(f.calls, "up"); return nil }
 func (f *fakeEngine) Health(string) (string, error)                 { return "healthy", nil }
+func (f *fakeEngine) Restart(s string) error                        { f.calls = append(f.calls, "restart "+s); return nil }
 
 func prepared(t *testing.T) *Prepared {
 	t.Helper()

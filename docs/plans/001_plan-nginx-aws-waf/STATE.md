@@ -11,8 +11,8 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Scope: plan 001 · RUNNING · overrides none
 - Unit: none
 - Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
-- Last closure: unit:P2:1
-- Next: open 3.1 · next eligible: 3.1
+- Last closure: unit:3.1:1
+- Next: open 3.2 · next eligible: 3.2
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -110,6 +110,7 @@ none
 - Do not let an expired CRL stay on the ingress: nginx then rejects every node (R10).
 - Do not expect `nginx -s reload` to reopen the ModSecurity audit log (handles keyed by path survive reloads); rotation flips the audit slot (1.7). `nginx -s reload` is asynchronous: wait on `127.0.0.1:8090/__rev` (1.5).
 - Do not log `$request_method` (GET after the error_page redirect of a block); use `$waf_method` (1.7).
+- Vector 0.62 (3.1): `${VAR}` in config needs VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true; the `vector` sink needs an `http://` address (no scheme = TLS); `geoip` table rejects Country DBs → `type: mmdb`; idle file sources back off up to ~8 s each → node reads access+audit with ONE file source and the join uses `max_events: 2`.
 
 ## 11. Board
 | Phase | Status | Attempt | Sub-phases | Closure ref |
@@ -130,7 +131,7 @@ Phase 2: DONE (unit:P2:1), 2.1–2.5 DONE attempt 1.
 Phase 3 (expanded):
 | ID | Depends | Status | Attempt | Assigned | Ref / note |
 |----|---------|--------|---------|----------|------------|
-| 3.1 | P1 | TODO | 1 | agent-1 | |
+| 3.1 | P1 | DONE | 1 | agent-1 | unit:3.1:1 |
 | 3.2 | 3.1 | TODO | 1 | agent-1 | |
 | 3.3 | 3.2 | TODO | 1 | agent-1 | |
 | 3.4 | 3.3 | TODO | 1 | agent-1 | |

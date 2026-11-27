@@ -1,0 +1,60 @@
+# Central Vector: receives from node Vectors, enriches events (GeoIP) and stores in ClickHouse.
+data_dir: /var/lib/vector
+enrichment_tables:
+  # Country DBs: the geoip table rejects them ("Unsupported MMDB database type"); the generic mmdb
+  # table returns the raw MaxMind record (country.iso_code). ASN stays on geoip.
+  geo_country: {type: mmdb, path: /etc/waf/geoip/GeoLite2-Country.mmdb}
+  geo_asn: {type: geoip, path: /etc/waf/geoip/GeoLite2-ASN.mmdb}
+sources:
+  from_nodes: {type: vector, address: "0.0.0.0:6000"}
+transforms:
+  route_t:
+    type: route
+    inputs: [from_nodes]
+    route:
+      event: '._t == "event"'
+      match: '._t == "match"'
+      hb: '._t == "hb"'
+  enrich:
+    type: remap
+    inputs: [route_t.event]
+    source: |
+      del(._t)
+      ip = string(.client_ip) ?? ""
+      c, err = get_enrichment_table_record("geo_country", {"ip": ip})
+      if err == null { .country = string(c.country_code) ?? string(c.country.iso_code) ?? "" }
+      a, err2 = get_enrichment_table_record("geo_asn", {"ip": ip})
+      if err2 == null { .asn = to_int(a.autonomous_system_number) ?? 0; .as_org = string(a.autonomous_system_organization) ?? "" }
+  m_clean: {type: remap, inputs: [route_t.match], source: 'del(._t)'}
+  hb_clean: {type: remap, inputs: [route_t.hb], source: 'del(._t)'}
+sinks:
+  ch_events:
+    type: clickhouse
+    inputs: [enrich]
+    endpoint: http://clickhouse:8123
+    database: waf
+    table: events
+    skip_unknown_fields: true
+    date_time_best_effort: true
+    auth: {strategy: basic, user: waf_ingest, password: "${WAF_CH_INGEST_PASSWORD}"}
+    batch: {timeout_secs: 2}
+  ch_matches:
+    type: clickhouse
+    inputs: [m_clean]
+    endpoint: http://clickhouse:8123
+    database: waf
+    table: matches
+    skip_unknown_fields: true
+    date_time_best_effort: true
+    auth: {strategy: basic, user: waf_ingest, password: "${WAF_CH_INGEST_PASSWORD}"}
+    batch: {timeout_secs: 2}
+  ch_heartbeats:
+    type: clickhouse
+    inputs: [hb_clean]
+    endpoint: http://clickhouse:8123
+    database: waf
+    table: heartbeats
+    skip_unknown_fields: true
+    date_time_best_effort: true
+    auth: {strategy: basic, user: waf_ingest, password: "${WAF_CH_INGEST_PASSWORD}"}
+    batch: {timeout_secs: 2}

@@ -84,6 +84,7 @@ func Render(cfg *config.Config, cat *catalog.Catalog, bypass map[string]bool, op
 	if err := r.extraFiles(files); err != nil {
 		return nil, err
 	}
+	files["vector/forward.yaml"] = forwardYAML(cfg.Node)
 	// Test hook (tests/e2e/apply.sh): WAF_TEST_INJECT=1 makes nginx.conf invalid.
 	if os.Getenv("WAF_TEST_INJECT") == "1" {
 		files["nginx/nginx.conf"] = append(files["nginx/nginx.conf"], []byte("bogus_directive on;\n")...)

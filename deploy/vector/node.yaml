@@ -1,31 +1,47 @@
-# WAF node log pipeline: nginx access JSON + ModSecurity audit JSON → joined events + matches (raw JSONL). Source: plan 001 snippets/vector-node.yaml (1.7).
+# WAF node log pipeline: nginx access JSON + ModSecurity audit JSON → joined events + matches (raw JSONL) + heartbeat; forwarding to central is the rendered runtime/current/vector/forward.yaml (3.1). Source: plan 001 snippets/vector-node.yaml (1.7).
 data_dir: /var/lib/vector
 
 sources:
-  waf_access:
+  # One file source for both logs (3.1): a single file server reads both files in the same pass,
+  # so the two halves of a request reach the join together. With two sources each idle file
+  # server backs off independently (Vector 0.62: up to ~8 s), which delayed and could split joins.
+  waf_logs:
     type: file
-    include: [/var/log/waf/access.log]
-    read_from: beginning
-  waf_audit:
-    type: file
-    include: [/var/log/waf/audit.log]
+    include: [/var/log/waf/access.log, /var/log/waf/audit.log]
     read_from: beginning
     max_line_bytes: 4194304
+  # Heartbeat (3.1): current runtime meta.json (single-line JSON) every 30 s.
+  hb_exec:
+    type: exec
+    mode: scheduled
+    scheduled: {exec_interval_secs: 30}
+    command: ["cat", "/etc/waf/runtime/current/meta.json"]
 
 transforms:
-  access_parse:
+  hb_parse:
     type: remap
-    inputs: [waf_access]
+    inputs: [hb_exec]
     drop_on_error: true
     source: |
+      m = object!(parse_json!(string!(.message)))
+      . = {"ts": format_timestamp!(now(), "%Y-%m-%dT%H:%M:%S%.3fZ", timezone: "UTC"),
+           "node_id": m.node_id, "version": m.version, "config_rev": m.config_rev, "sites": m.sites}
+
+  access_parse:
+    type: remap
+    inputs: [waf_logs]
+    drop_on_error: true
+    source: |
+      if .file != "/var/log/waf/access.log" { abort }
       a = parse_json!(.message)
       . = {"rid": a.rid, "access": a}
 
   audit_parse:
     type: remap
-    inputs: [waf_audit]
+    inputs: [waf_logs]
     drop_on_error: true
     source: |
+      if .file != "/var/log/waf/audit.log" { abort }
       t = parse_json!(.message).transaction
       . = {"rid": t.unique_id, "audit": t}
 
@@ -33,7 +49,10 @@ transforms:
     type: reduce
     inputs: [access_parse, audit_parse]
     group_by: [rid]
+    # access + audit → flush at once; access-only (not inspected) after 3 s
+    max_events: 2
     expire_after_ms: 3000
+    flush_period_ms: 500
     merge_strategies:
       access: discard
       audit: discard

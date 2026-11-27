@@ -1,0 +1,47 @@
+# Central storage (project "waf"): ClickHouse + central Vector. Role central, or all-in-one with node.yml.
+# Secrets: compose is invoked with --env-file $WAF_CONFIG_DIR/secrets.env (wafctl secrets init).
+name: waf
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8-alpine
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: waf_admin
+      CLICKHOUSE_PASSWORD: ${WAF_CH_ADMIN_PASSWORD:?run wafctl secrets init}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+      WAF_CH_INGEST_PASSWORD: ${WAF_CH_INGEST_PASSWORD:?}
+      WAF_CH_RO_PASSWORD: ${WAF_CH_RO_PASSWORD:?}
+    volumes:
+      - ${WAF_CENTRAL_DIR}/clickhouse:/var/lib/clickhouse
+      - ../clickhouse/initdb:/docker-entrypoint-initdb.d:ro
+      - ../clickhouse/config.d/waf.xml:/etc/clickhouse-server/config.d/waf.xml:ro
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    ports: ["127.0.0.1:8123:8123"]
+    networks: [central]
+  vector-central:
+    image: timberio/vector:0.62.0-alpine
+    restart: unless-stopped
+    command: ["--config", "/etc/vector/vector.yaml"]
+    environment:
+      WAF_CH_INGEST_PASSWORD: ${WAF_CH_INGEST_PASSWORD:?}
+      # Vector >= 0.62 no longer interpolates ${VAR} in config files unless allowed explicitly;
+      # central.yaml needs it only for the ClickHouse ingest password.
+      VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION: "true"
+    volumes:
+      - ../vector/central.yaml:/etc/vector/vector.yaml:ro
+      - ${WAF_CENTRAL_DIR}/vector:/var/lib/vector
+      - ${WAF_DATA_DIR}/geoip:/etc/waf/geoip:ro
+    ports: ["127.0.0.1:6000:6000"]
+    depends_on:
+      clickhouse: {condition: service_healthy}
+    networks: [central]
+networks:
+  central:
+    name: waf_central

@@ -8,7 +8,6 @@ import (
 
 	"nginxawswaf/wafctl/internal/apply"
 	"nginxawswaf/wafctl/internal/config"
-	"nginxawswaf/wafctl/internal/docker"
 	"nginxawswaf/wafctl/internal/env"
 	"nginxawswaf/wafctl/internal/logs"
 )
@@ -32,11 +31,7 @@ func cmdLogs(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	home, err := env.Home()
-	if err != nil {
-		return fail("%v", err)
-	}
-	eng, err := docker.NewCompose(home, cfg.Node.Network, env.DataDir())
+	eng, err := newEngine(cfg.Node)
 	if err != nil {
 		return fail("%v", err)
 	}

@@ -1,0 +1,9 @@
+# All-in-one bridge mode (lab): central services also join waf_lab, so the node Vector reaches vector-central:6000.
+services:
+  clickhouse:
+    networks: [central, lab]
+  vector-central:
+    networks: [central, lab]
+networks:
+  lab:
+    name: waf_lab

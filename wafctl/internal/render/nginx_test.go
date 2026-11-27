@@ -23,7 +23,7 @@ func TestR9_GoldenNginx(t *testing.T) {
 			t.Errorf("%s missing", f)
 		}
 	}
-	if !strings.Contains(string(out.Files["meta.json"]), `"config_rev": "`+out.Rev+`"`) {
+	if !strings.Contains(string(out.Files["meta.json"]), `"config_rev":"`+out.Rev+`"`) {
 		t.Errorf("meta.json config_rev wrong")
 	}
 	ng := string(out.Files["nginx/nginx.conf"])

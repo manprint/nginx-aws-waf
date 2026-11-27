@@ -18,6 +18,7 @@ type Engine interface {
 	RunOnce(svc string, args ...string) (string, error)
 	Up() error
 	Health(svc string) (string, error)
+	Restart(svc string) error
 }
 
 // Compose is the docker compose implementation of Engine.
@@ -25,10 +26,37 @@ type Compose struct {
 	Project string
 	Files   []string
 	Env     []string // extra environment (e.g. WAF_DATA_DIR)
+	EnvFile string   // --env-file (secrets.env), optional
 }
 
-// NewCompose picks node.yml + host|bridge + $WAF_COMPOSE_EXTRA (colon-separated) under home.
-func NewCompose(home, network, dataDir string) (*Compose, error) {
+// Params selects the compose files and environment of a node.
+type Params struct {
+	Home, Role, Network, NodeID    string
+	DataDir, ConfigDir, CentralDir string
+}
+
+// Files returns the compose files for a role (relative to home/deploy/compose):
+// node → node.yml + node.<network>.yml; central → central.yml;
+// all-in-one → both (+ central.bridge.yml in bridge mode, so the node Vector reaches vector-central).
+func Files(role, network string) []string {
+	node := []string{"node.yml", "node." + network + ".yml"}
+	switch role {
+	case "central":
+		return []string{"central.yml"}
+	case "all-in-one":
+		f := append(node, "central.yml")
+		if network == "bridge" {
+			f = append(f, "central.bridge.yml")
+		}
+		return f
+	}
+	return node
+}
+
+// NewCompose picks the role's compose files + $WAF_COMPOSE_EXTRA (colon-separated) under home.
+// $WAF_CONFIG_DIR/secrets.env, when present, is passed with --env-file.
+func NewCompose(p Params) (*Compose, error) {
+	home := p.Home
 	if _, err := exec.LookPath("docker"); err != nil {
 		return nil, errors.New("docker is not installed")
 	}
@@ -36,7 +64,10 @@ func NewCompose(home, network, dataDir string) (*Compose, error) {
 		return nil, errors.New("docker compose is not installed")
 	}
 	d := filepath.Join(home, "deploy", "compose")
-	files := []string{filepath.Join(d, "node.yml"), filepath.Join(d, "node."+network+".yml")}
+	var files []string
+	for _, f := range Files(p.Role, p.Network) {
+		files = append(files, filepath.Join(d, f))
+	}
 	if x := os.Getenv("WAF_COMPOSE_EXTRA"); x != "" {
 		for _, f := range strings.Split(x, ":") {
 			if f == "" {
@@ -48,15 +79,25 @@ func NewCompose(home, network, dataDir string) (*Compose, error) {
 			files = append(files, f)
 		}
 	}
-	p := os.Getenv("WAF_COMPOSE_PROJECT")
-	if p == "" {
-		p = "waf"
+	proj := os.Getenv("WAF_COMPOSE_PROJECT")
+	if proj == "" {
+		proj = "waf"
 	}
-	return &Compose{Project: p, Files: files, Env: []string{"WAF_DATA_DIR=" + dataDir}}, nil
+	c := &Compose{Project: proj, Files: files, Env: []string{"WAF_DATA_DIR=" + p.DataDir, "WAF_CONFIG_DIR=" + p.ConfigDir,
+		"WAF_CENTRAL_DIR=" + p.CentralDir, "WAF_NODE_ID=" + p.NodeID}}
+	if sf := filepath.Join(p.ConfigDir, "secrets.env"); fileExists(sf) {
+		c.EnvFile = sf
+	}
+	return c, nil
 }
+
+func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 func (c *Compose) base() []string {
 	a := []string{"compose", "-p", c.Project}
+	if c.EnvFile != "" {
+		a = append(a, "--env-file", c.EnvFile)
+	}
 	for _, f := range c.Files {
 		a = append(a, "-f", f)
 	}
@@ -120,4 +161,13 @@ func (c *Compose) Health(svc string) (string, error) {
 	}
 	out, err := c.run("inspect", "-f", "{{.State.Health.Status}}", id)
 	return strings.TrimSpace(out), err
+}
+
+// Restart restarts svc (e.g. vector after its forward config changed).
+func (c *Compose) Restart(svc string) error {
+	out, err := c.run(append(c.base(), "restart", svc)...)
+	if err != nil {
+		return fmt.Errorf("%w\n%s", err, out)
+	}
+	return nil
 }
