@@ -344,3 +344,17 @@
   - Tokens: sha256 only, constant-time compare, single use, bound to a CN, and never burned by an invalid or mismatching CSR.
   - Revocation: verified end to end (0 events after the revoke, ingress logs "certificate revoked"); the CRL timer is in place and documented.
   - Docs: multi-node.md warns about an expired CRL and covers the CA backup.
+
+## 6.1 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- The rate limit and geo block features already existed (P1). This unit proves them end to end.
+- NEW lab/config/sites/{ratelimit,ratecount,geo}.yaml: generic echo sites with xff, profile aws-default. WAF keys sit inline in the site file, as the Site struct inlines WAF; the plan's sketch had no `waf:` wrapper.
+- NEW tests/corpus/optional.yaml:
+  - geo-gb → 403 GeoBlock;
+  - geo-se → 200 Default_Action;
+  - geo-v6-jp → 200 Default_Action (the runner requires terminating_rule).
+- NEW tests/e2e/ratelimit.sh. Each run uses a distinct 198.51.100.x client, because limit_req state survives the 60 s window.
+  - ratelimit: 40 requests → 11×200 (burst 10 + 1) and 29×403. Access log `rl=REJECTED` = 29. ClickHouse has 29 events with `terminating_type=RATE_BASED`, `action=BLOCK` and `rate_limit_status=REJECTED`.
+  - ratecount: 40×200, `REJECTED_DRY_RUN` on 29 requests, 0 BLOCK events.
+- WRITE lab/config/node.yaml: `geoip.enabled: true` (MaxMind test DBs). lab-min-up already runs geoip-test when the mmdb is missing, which is equivalent to the dependency the plan asks for.
+- NEW TestR13_ (SecGeoLookupDb, plus the GeoBlock custom rule `@rx ^(?:GB)$` before the first managed group) and TestR14_ (`rate=10r/m`, `burst=10`, no dry_run for block).
+- G-U61: 2 PASS. `make test-e2e` PASSED 65/65 (with optional.yaml). ratelimit.sh ALL PASS. Regression: smoke, apply, central and cli ALL PASS; go test 0 FAIL.

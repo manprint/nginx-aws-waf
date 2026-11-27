@@ -1,0 +1,9 @@
+# Optional feature (6.1): geo block (GeoLite2-Country; the lab uses the MaxMind test database).
+version: 1
+site_id: geo
+server_names: [geo.lab.test]
+app: generic
+upstream: {servers: ["echo:8081"]}
+client_ip: {source: xff, trusted_proxies: ["0.0.0.0/0", "::/0"]}
+profile: aws-default
+geo_block: {countries: [GB], action: block}

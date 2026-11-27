@@ -80,3 +80,43 @@ func TestR11_TLSRedirect(t *testing.T) {
 		t.Errorf("default server rendered although default_site is set")
 	}
 }
+
+func TestR13_GeoBlockRender(t *testing.T) {
+	cfg, _ := config.Load(fixtureDir)
+	cfg.Node.GeoIP.Enabled = true
+	cfg.Site("demo").GeoBlock = &config.GeoBlock{Countries: []string{"GB"}, Action: "block"}
+	out, err := Render(cfg, testCat(t), nil, Options{Now: fixedNow, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out.Files["modsec/main.conf"]), "SecGeoLookupDb /etc/waf/geoip/GeoLite2-Country.mmdb") {
+		t.Errorf("SecGeoLookupDb missing")
+	}
+	main := string(out.Files["modsec/main.conf"])
+	gb := strings.Index(main, "tag:'awswaf-rule:custom:demo/GeoBlock'")
+	if gb < 0 || !strings.Contains(main, `SecRule TX:geo_cc "@rx ^(?:GB)$"`) {
+		t.Fatalf("GeoBlock custom rule missing:\n%s", main)
+	}
+	// slot start: before the first managed group
+	for _, g := range []string{"# ---- AWSManagedRulesAmazonIpReputationList", "# ---- AWSManagedRulesCommonRuleSet"} {
+		if i := strings.Index(main, g); i < 0 || i < gb {
+			t.Errorf("GeoBlock (at %d) not before %s (at %d)", gb, g, i)
+		}
+	}
+}
+
+func TestR14_RateLimitLabSite(t *testing.T) {
+	cfg, _ := config.Load(fixtureDir)
+	cfg.Site("demo").RateLimit = &config.RateLimit{Limit: 10, WindowSec: 60, Action: "block"}
+	out, err := Render(cfg, testCat(t), nil, Options{Now: fixedNow, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out.Files["nginx/nginx.conf"]), "limit_req_zone $binary_remote_addr zone=rl_demo:10m rate=10r/m;") {
+		t.Errorf("zone missing")
+	}
+	s := string(out.Files["nginx/sites/demo.conf"])
+	if !strings.Contains(s, "limit_req zone=rl_demo burst=10 nodelay; limit_req_status 403;") || strings.Contains(s, "limit_req_dry_run on;") {
+		t.Errorf("limit_req lines:\n%s", s)
+	}
+}

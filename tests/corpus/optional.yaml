@@ -1,0 +1,25 @@
+# Optional features (6.1): geo block on site geo (lab GeoLite2 = MaxMind test database).
+# Rate limiting is stateful: tests/e2e/ratelimit.sh. SQLi and AnonymousIp: sqli.yaml, anonip.yaml (site strict).
+version: 1
+cases:
+- id: geo-gb
+  site: geo
+  request:
+    xff: 2.125.160.216
+  expect:
+    status: 403
+    terminating_rule: GeoBlock
+- id: geo-se
+  site: geo
+  request:
+    xff: 89.160.20.112
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: geo-v6-jp
+  site: geo
+  request:
+    xff: 2001:218::1
+  expect:
+    status: 200
+    terminating_rule: Default_Action

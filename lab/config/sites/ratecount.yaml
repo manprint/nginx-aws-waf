@@ -1,0 +1,9 @@
+# Optional feature (6.1): rate-based rule, 10 requests / 60 s per client IP in Count (limit_req_dry_run: REJECTED_DRY_RUN, never blocked).
+version: 1
+site_id: ratecount
+server_names: [ratecount.lab.test]
+app: generic
+upstream: {servers: ["echo:8081"]}
+client_ip: {source: xff, trusted_proxies: ["0.0.0.0/0", "::/0"]}
+profile: aws-default
+rate_limit: {limit: 10, window_sec: 60, action: count}

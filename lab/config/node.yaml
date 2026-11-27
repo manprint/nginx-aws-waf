@@ -4,6 +4,6 @@ role: all-in-one
 network: bridge
 listen: {http: 8080, https: 8443, ipv6: true}
 workers: 2
-geoip: {enabled: false}
+geoip: {enabled: true}   # lab: MaxMind test databases (make geoip-test)
 audit: {scope: all}
 lab: {enabled: true}
