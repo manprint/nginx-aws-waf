@@ -156,10 +156,26 @@ func RenderIngress(c Config, s *pki.Store, outDir string, now time.Time) (bool, 
 }
 
 // PublishCRL copies the PKI crl.pem into the ingress certs dir; reports whether it changed.
+// A CRL not signed by the CA the ingress trusts (ingress/certs/ca.pem) is refused: nginx would
+// fail every client handshake with "unable to get certificate CRL" (V001-F1).
 func PublishCRL(s *pki.Store, outDir string) (bool, error) {
 	b, err := os.ReadFile(filepath.Join(s.Dir, "crl.pem"))
 	if err != nil {
 		return false, err
+	}
+	if caPEM, err := os.ReadFile(filepath.Join(IngressCertsDir(outDir), "ca.pem")); err == nil {
+		ca, err := pki.ParseCertPEM(caPEM)
+		if err != nil {
+			return false, fmt.Errorf("crl: ingress ca.pem: %w", err)
+		}
+		crl, err := s.ReadCRL()
+		if err != nil {
+			return false, err
+		}
+		if crl.CheckSignatureFrom(ca) != nil {
+			return false, fmt.Errorf("crl: issuer %q is not the ingress CA %q: refusing to publish (WAF_PKI_DIR=%s)",
+				crl.Issuer.CommonName, ca.Subject.CommonName, s.Dir)
+		}
 	}
 	p := filepath.Join(IngressCertsDir(outDir), "crl.pem")
 	if old, err := os.ReadFile(p); err == nil && bytes.Equal(old, b) {

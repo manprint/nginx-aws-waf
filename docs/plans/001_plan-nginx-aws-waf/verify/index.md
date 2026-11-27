@@ -14,7 +14,7 @@ are not recomputed as findings are fixed; current unresolved findings are below.
 ## Findings
 | ID | Severity | Title | Current status | Closed by / date | Evidence |
 |----|----------|-------|----------------|------------------|----------|
-| V001-F1 | MAJOR | CRL publish overwrites the live ingress CRL with a foreign CA's | OPEN | — | V001 §F1 |
+| V001-F1 | MAJOR | CRL publish overwrites the live ingress CRL with a foreign CA's | FIXED | V001-C1 · 27-11-2026 | TestCRL1_ PASS (FAIL without fix); pki-isolation.sh ALL PASS; multinode after pki.sh ALL PASS |
 | V001-F2 | MINOR | 3.3 double completion commit + history.md rewritten in place | OPEN | — | V001 §F2 |
 
 Statuses: OPEN, FIXED, ACCEPTED (user decision), OBSOLETE (reason recorded).

@@ -142,6 +142,12 @@ openssl crl -in $WAF_PKI_DIR/crl.pem -noout -nextupdate
 
 Se il centrale è rimasto spento per più di 7 giorni, all'avvio esegui subito `wafctl pki crl`.
 
+Una CRL firmata da un'altra CA ha lo stesso effetto: nginx rifiuta tutti i nodi con
+`FAILED:unable to get certificate CRL`. Per questo `wafctl pki revoke|crl` pubblica la CRL
+sull'ingress solo se è firmata dalla CA dell'ingress (`ingress/certs/ca.pem`). Se `WAF_PKI_DIR`
+punta a un'altra CA il comando termina con
+`crl: issuer "…" is not the ingress CA "…": refusing to publish` e l'ingress non viene toccato.
+
 ### Backup della CA
 
 Senza `private/ca.key` non si possono emettere né rinnovare certificati, né aggiornare la CRL.

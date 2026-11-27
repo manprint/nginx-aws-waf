@@ -12,7 +12,7 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Unit: none
 - Base: HEAD 49bacd7 + clean tree · branch main · last WIP tree none
 - Last closure: unit:PLAN:1
-- Next: V001-C1 (reopens phase 5), then V001-C2, P5/2, PLAN/2
+- Next: V001-C2, then P5/2, PLAN/2
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -69,13 +69,13 @@ none
 | G-U43 | 4.3 | `go test ./internal/central -run 'TestAL[12]_' -v && tests/e2e/alerts.sh` | T-AL3/4/5 PASS |
 | G-U44 | 4.4 | docs review | self-review evidence |
 | G-P4 | P4 | `make lab-up && scripts/check-dashboards.sh && tests/e2e/alerts.sh` | all pass |
-| G-U51 | 5.1 | `go test ./internal/pki -run 'TestPKI[1-5]_' -v` + openssl checks | 5 PASS |
+| G-U51 | 5.1 | `go test ./internal/pki -run 'TestPKI[1-5]_' -v` + openssl checks (`tests/e2e/pki.sh`) + `go test ./internal/central -run TestCRL1_ -v` + `tests/e2e/pki-isolation.sh` (V001-C1) | 5 PASS; 1 PASS; ALL PASS |
 | G-U52 | 5.2 | `go test ./internal/central ./internal/render -run 'TestING1_\|TestFWD1_' -v` + `tests/e2e/multinode.sh part1` | 2 PASS; T-MN1 |
 | G-U53 | 5.3 | `go test ./internal/pki ./internal/node -run 'TestSRV[1-4]_\|TestND1_' -v` + `tests/e2e/multinode.sh` | 5 PASS; T-MN2..5 |
 | G-U54 | 5.4 | `go test ./internal/node -run 'TestBS[12]_' -v && tests/e2e/bootstrap.sh` | 2 PASS; script PASS |
 | G-U55 | 5.5 | `make tf-validate` | `Success!` |
 | G-SEC | 5.x, P5, PLAN | `git ls-files \| grep -E '(\.pem\|\.key\|secrets\.env\|tokens\.json\|apprise-urls\.txt)$' \| grep -vx 'lab/config/apprise-urls.txt'` and the same over `git log --all --name-only --format=` | both empty |
-| G-P5 | P5 | `make test-unit && make lab-up && tests/e2e/multinode.sh && tests/e2e/bootstrap.sh && make tf-validate` + G-SEC | all pass |
+| G-P5 | P5 | `make test-unit && make lab-up && tests/e2e/pki-isolation.sh && tests/e2e/multinode.sh && tests/e2e/bootstrap.sh && make tf-validate` + G-SEC | all pass |
 | G-U61 | 6.1 | `go test ./internal/render -run 'TestR1[34]_' -v && make test-e2e && tests/e2e/ratelimit.sh` | 2 PASS; corpus incl. optional.yaml; RATE_BASED |
 | G-U62 | 6.2 | `go test ./internal/awsexport -run 'TestEXP[1-6]_' -v` + the T-EXP7 loop | 6 PASS; every lab site VALID |
 | G-U63 | 6.3 | `go test ./internal/awsexport -run 'TestTF[1-3]_' -v` + `scripts/tf-validate-export.sh build/aws/shop18.tf` | 3 PASS; VALID |
@@ -113,9 +113,9 @@ none
 | 2 | DONE | 1 | 2.1–2.5 | unit:P2:1 |
 | 3 | DONE | 1 | 3.1–3.6 | unit:P3:1 |
 | 4 | DONE | 1 | 4.1–4.4 | unit:P4:1 |
-| 5 | DONE | 1 | 5.1–5.5 | unit:P5:1 |
+| 5 | IN_PROGRESS | 2 | 5.1–5.5 DONE + V001-C1 | unit:P5:1 |
 | 6 | DONE | 1 | 6.1–6.5 | unit:P6:1 |
-| PLAN | DONE | 1 | — | unit:PLAN:1 |
+| PLAN | TODO | 2 | — | unit:PLAN:1 |
 
 README obligation: fulfilled (1.9, 2.5, 3.6, 4.4, 5.5, 6.5).
 Open audits: none.
@@ -123,7 +123,7 @@ Open audits: none.
 Corrections (V001):
 | Correction | Status | Attempt | Findings | Reopens | Closure ref |
 |------------|--------|---------|----------|---------|-------------|
-| V001-C1 | TODO | — | F1 | 5 | — |
+| V001-C1 | DONE | 1 | F1 | 5 | unit:V001-C1:1 |
 | V001-C2 | TODO | — | F2 | — | — |
 Statuses: TODO, IN_PROGRESS, IN_REVIEW, DONE, SKIPPED (reason kept), BLOCKED.
 

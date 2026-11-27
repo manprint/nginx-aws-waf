@@ -486,3 +486,23 @@
 
 ## 27-11-2026 V001/1 complete (audit commit)
 Gates: all registry gates run on 2d33b11 (results in verify_001); multinode FAILED 4 after pki.sh → V001-F1. Review: agent-1:opus. Verdict FAIL (1 MAJOR, 1 MINOR). Corrections V001-C1 (reopens phase 5), V001-C2.
+
+## 27-11-2026 V001-C1/1 complete (commit below)
+Gates:
+- TestCRL1_PublishRefusesForeignCA PASS. Negative check: without the fix it FAILs with "foreign CRL: changed=true".
+- TestING1_ PASS.
+- tests/e2e/pki-isolation.sh ALL PASS (4).
+- multinode.sh ALL PASS in the same session after pki.sh.
+
+Review: agent-1:opus self-review.
+
+Changes:
+- wafctl/internal/central/ingress.go: PublishCRL checks the CRL signature against ingress/certs/ca.pem.
+- NEW ingress_crl_test.go.
+- tests/e2e/pki.sh: WAF_DATA_DIR and WAF_CENTRAL_DIR are now throwaway.
+- NEW tests/e2e/pki-isolation.sh.
+- docs/multi-node.md.
+
+Notes:
+- Gate registry (non-weakening): G-U51 adds TestCRL1_ and pki-isolation.sh; G-P5 adds pki-isolation.sh before multinode.
+- Phase 5 reopened (attempt 2); PLAN back to TODO (attempt 2).

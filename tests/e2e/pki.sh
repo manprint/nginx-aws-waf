@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # PKI core (5.1) with openssl as the independent verifier, in a throwaway $WAF_PKI_DIR.
+# Data/central dirs are throwaway too: a revoke must never publish this CRL to a live ingress (V001-F1).
 set -uo pipefail
 source "$(dirname "$0")/lib.sh"
 W="${WAFCTL:-$ROOT/wafctl/bin/wafctl}"
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
-export WAF_PKI_DIR="$T/pki"
+export WAF_PKI_DIR="$T/pki" WAF_DATA_DIR="$T/data" WAF_CENTRAL_DIR="$T/central"
 fp=$("$W" pki init --name e2e | sed -n 's/^ca_sha256=//p')
 check "PKI-init-fingerprint-matches-openssl" test "$fp" = "$(openssl x509 -in "$T/pki/ca.pem" -outform der | sha256sum | cut -d' ' -f1)"
 check "PKI-init-twice-refused" bash -c "! '$W' pki init --name e2e 2>/dev/null"
