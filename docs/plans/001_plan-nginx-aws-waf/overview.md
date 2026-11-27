@@ -213,6 +213,7 @@ Docker Hub and GitHub API, checked 26-11-2026:
 - `grafana-clickhouse-datasource` 4.24.0
 
 Decision impact: pinned in compose files.
+- Addendum (5.5, 27-11-2026): `hashicorp/terraform:1` does not exist on Docker Hub (tags are `1.17`, `1.17.2`, …); pinned `hashicorp/terraform:1.17.2` (`terraform version` → v1.17.2) in the Makefile `TF_IMAGE`; provider `hashicorp/aws ~> 6.0` locked in `deploy/terraform/.terraform.lock.hcl`.
 
 ### R5 — ALB body limit
 - Source: `docs/aws/body-inspection-limit.md` lines 12 and 24: "For Application Load Balancer, the default limit is 8 KB …, and you can increase the limit up to 64 KB (8/16/32/48/64)".

@@ -44,9 +44,14 @@ Il modo normale resta correggere la config (git revert nel repo del nodo) e rifa
 |---|---|---|
 | `wafctl-bypass-expire.timer` / `.service` | ogni minuto | `wafctl bypass expire`: rimuove i bypass scaduti e riapplica solo se è cambiato qualcosa |
 | `wafctl-logs.timer` / `.service` | ogni ora | `wafctl logs rotate` |
+| `wafctl-node-renew.timer` / `.service` | ogni giorno (+ fino a 1 h casuale) | `wafctl node renew`: rinnova il certificato del nodo se mancano meno di 30 giorni (ruolo node) |
+| `wafctl-pki-crl.timer` / `.service` | ogni giorno | `wafctl pki crl`: rigenera la CRL (vale 7 giorni) e ricarica l'ingress (centrale) |
+| `wafctl-pki.service` | sempre attivo | `wafctl pki serve --addr :6001`: API di enrollment/rinnovo (centrale) |
 
-Installazione: copiare i file in `/etc/systemd/system/`, `wafctl` in `/usr/local/bin/`, poi
-`systemctl daemon-reload && systemctl enable --now wafctl-bypass-expire.timer wafctl-logs.timer`.
+Installazione: `wafctl node bootstrap ... --install-systemd` copia le unit e abilita quelle del
+ruolo ([multi-node.md](multi-node.md)). In alternativa, a mano: copiare i file in
+`/etc/systemd/system/` e `wafctl` in `/usr/local/bin/`, poi eseguire
+`systemctl daemon-reload && systemctl enable --now <unit>`.
 
 ## Log e rotazione
 

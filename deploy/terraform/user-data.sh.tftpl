@@ -1,0 +1,14 @@
+#!/bin/bash
+# cloud-init user data (rendered by Terraform): Docker + release + bootstrap with systemd timers.
+# Enrollment stays manual: it needs a one-time token from the central (docs/multi-node.md).
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -q
+apt-get install -y -q docker.io docker-compose-v2 git curl
+systemctl enable --now docker
+cd /tmp
+curl -fsSL -o waf-release.tgz '${release_url}'
+mkdir -p waf-release && tar -C waf-release --strip-components=1 -xzf waf-release.tgz
+waf-release/scripts/install-node.sh
+export WAF_HOME=/opt/nginx-aws-waf WAF_CONFIG_DIR=/etc/waf-node WAF_DATA_DIR=/srv/waf
+wafctl node bootstrap --node-id '${node_id}' --role '${role}' --central '${central}' --network host --install-systemd

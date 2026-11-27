@@ -18,6 +18,13 @@ release: ## release tarball build/nginx-aws-waf-$(VERSION).tar.gz (make release 
 	@[ -n "$(VERSION)" ] || { echo "usage: make release VERSION=x.y.z" >&2; exit 2; }
 	./scripts/build-release.sh $(VERSION)
 
+TF_IMAGE := hashicorp/terraform:1.17.2
+.PHONY: tf-validate
+tf-validate: ## terraform init (no backend) + validate of deploy/terraform in Docker (never applied)
+	docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v $(CURDIR)/deploy/terraform:/tf -w /tf $(TF_IMAGE) init -backend=false -input=false >/dev/null
+	docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v $(CURDIR)/deploy/terraform:/tf -w /tf $(TF_IMAGE) validate
+	docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v $(CURDIR)/deploy/terraform:/tf -w /tf $(TF_IMAGE) fmt -check -diff
+
 .PHONY: lists
 lists: ## prepare .run/lists for lab renders and nginx -t
 	mkdir -p .run/lists && cp data/ip-reputation/*.txt .run/lists/ && cp data/ip-reputation/custom-test.txt .run/lists/custom-reputation.txt && printf '2001:db8:bad::/48\n' >> .run/lists/custom-reputation.txt && printf '# placeholder\n' > .run/lists/HostingProviderIPList.txt

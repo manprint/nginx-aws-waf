@@ -310,3 +310,20 @@
 - In the e2e, a `docker compose version` shim stands in for Docker in the container (no Docker-in-Docker). The no-Docker refusal path is tested first.
 - Not e2e-tested: `--install-systemd` (the container has no systemd). The root check and the unit lists are covered by code review only.
 - G-U54: TestBS1_/TestBS2_ PASS (2). bootstrap.sh ALL PASS (10 checks: validate rc 0, 1 commit, secrets 0600 and untracked, second run refused).
+
+## 5.5 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW deploy/terraform/{versions.tf,variables.tf,main.tf,outputs.tf,user-data.sh.tftpl,README.md,.terraform.lock.hcl}:
+  - provider hashicorp/aws ~> 6.0;
+  - `var.nodes` map name → {role, instance_type, subnet_id}, with validations for role and node_id;
+  - SG `web`: 80/443 from 0.0.0.0/0 and ::/0, for node and all-in-one;
+  - SG `central`: 6000/6001 only from `var.node_cidrs` (v4/v6), for central and all-in-one;
+  - Ubuntu 24.04 AMI lookup (Canonical) or `var.ami_id`; IMDSv2 required; encrypted gp3 root;
+  - user_data installs docker.io + docker-compose-v2 + git, downloads `var.release_url`, then runs install-node.sh and `node bootstrap --install-systemd`. Enrollment stays manual (one-time token).
+  - Never applied (D30).
+- Makefile:
+  - `TF_IMAGE := hashicorp/terraform:1.17.2` (the plan's `hashicorp/terraform:1` tag does not exist; R4 addendum written);
+  - `tf-validate` runs init -backend=false, validate and `fmt -check`, as the invoking uid so the files are not root-owned.
+- .gitignore: `.terraform/`, tfstate, tfvars.
+- NEW docs/multi-node.md (Italian): topology (on-prem / AWS / tailnet), ports and firewall, PKI layout and modes, init, token/enroll (pinning), renew, revoke (10 s session drop), the expired-CRL warning with check commands, CA backup (offline, encrypted), install (release → install-node → bootstrap), Tailscale, Terraform, the two-node lab.
+- WRITE README.md: Multi-nodo section, directory map, doc index. WRITE docs/operations.md: systemd table with node-renew, pki-crl and pki.
+- G-U55: `make tf-validate` → "Success! The configuration is valid."; fmt -check clean.
