@@ -14,6 +14,7 @@ Tutti i comandi partono dalla root del repo dopo `source scripts/lab-env.sh`.
 | Grafana | `tests/e2e/grafana.sh`, `scripts/check-dashboards.sh` | dashboard, datasource, utenti, ogni query dei pannelli |
 | Alert | `tests/e2e/alerts.sh` | regole sane, test del contact point, picco di blocchi → notifica all'`alert-sink` (~4 min) |
 | PKI | `tests/e2e/pki.sh` | CA, certificati client/server, revoca e CRL verificati con `openssl` (directory temporanea) |
+| Bootstrap | `tests/e2e/bootstrap.sh` | tarball di release installato in un container `ubuntu:24.04` pulito; `install-node.sh` rifiuta senza Docker; `wafctl node bootstrap` + `validate`; un solo commit e nessun segreto tracciato |
 | Multi-nodo | `tests/e2e/multinode.sh [part1]` | secondo nodo `waf2` (`.run2`, porta 18080) che inoltra via mTLS all'ingress; l'ingress rifiuta i client senza certificato. Parte 2 (~1 min): enrollment con token tramite `wafctl pki serve`, riuso del token → 403, `node renew --force`, revoca → nessun evento dal nodo revocato, re-enrollment finale |
 
 ## Corpus (`tests/corpus/*.yaml`)

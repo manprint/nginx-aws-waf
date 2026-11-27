@@ -12,7 +12,7 @@ import (
 	"nginxawswaf/wafctl/internal/pki"
 )
 
-func central(t *testing.T) (*pki.Store, string) {
+func pkiCentral(t *testing.T) (*pki.Store, string) {
 	t.Helper()
 	s := &pki.Store{Dir: filepath.Join(t.TempDir(), "pki")}
 	if err := s.Init("node"); err != nil {
@@ -35,7 +35,7 @@ func central(t *testing.T) (*pki.Store, string) {
 }
 
 func TestND1_RenewSkipsWhenFresh(t *testing.T) {
-	s, addr := central(t)
+	s, addr := pkiCentral(t)
 	dir := filepath.Join(t.TempDir(), "_node")
 	tok, fp, _ := s.NewToken("lab-node-2", time.Hour)
 	// a wrong pin aborts before anything is sent or written

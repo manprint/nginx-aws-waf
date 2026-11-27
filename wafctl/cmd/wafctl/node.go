@@ -16,11 +16,16 @@ import (
 
 const nodeUsage = `usage: wafctl node <command>
   enroll --token T --ca-sha256 H [--central host:pki_port]   get the client cert (one-time token)
-  renew [--force] [--central host:pki_port]                  renew when < 30 d left (daily timer)`
+  renew [--force] [--central host:pki_port]                  renew when < 30 d left (daily timer)
+  bootstrap --node-id ID --role node|central|all-in-one [--central HOST] [--network host|bridge]
+            [--install-systemd] [--force]                    create $WAF_CONFIG_DIR (git repo) and $WAF_DATA_DIR`
 
 func cmdNode(args []string) int {
 	if len(args) == 0 {
 		return fail("%s", nodeUsage)
+	}
+	if args[0] == "bootstrap" {
+		return nodeBootstrap(args[1:])
 	}
 	cfg, err := config.Load(env.ConfigDir())
 	if err != nil {
@@ -85,5 +90,30 @@ func cmdNode(args []string) int {
 		}
 		fmt.Fprintln(os.Stderr, "vector restarted")
 	}
+	return 0
+}
+
+func nodeBootstrap(args []string) int {
+	fs := flag.NewFlagSet("node bootstrap", flag.ContinueOnError)
+	o := node.BootstrapOptions{}
+	fs.StringVar(&o.NodeID, "node-id", "", "node id (lower-case, digits, dashes)")
+	fs.StringVar(&o.Role, "role", "", "node|central|all-in-one")
+	fs.StringVar(&o.Central, "central", "", "central host name/IP (node.yaml central.address; ingress server name for central roles)")
+	fs.StringVar(&o.Network, "network", "host", "host|bridge")
+	fs.BoolVar(&o.InstallSystemd, "install-systemd", false, "install the systemd units and enable the role's timers (root)")
+	fs.BoolVar(&o.Force, "force", false, "overwrite the generated files when node.yaml exists")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	home, err := env.Home()
+	if err != nil {
+		return fail("%v", err)
+	}
+	o.Home, o.ConfigDir, o.DataDir = home, env.ConfigDir(), env.DataDir()
+	next, err := node.Bootstrap(o)
+	if err != nil {
+		return fail("%v", err)
+	}
+	fmt.Print(next)
 	return 0
 }

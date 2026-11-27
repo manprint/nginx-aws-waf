@@ -13,6 +13,11 @@ wafctl: ## build wafctl into wafctl/bin
 test-unit: ## go unit tests
 	cd wafctl && go test ./...
 
+.PHONY: release
+release: ## release tarball build/nginx-aws-waf-$(VERSION).tar.gz (make release VERSION=x.y.z)
+	@[ -n "$(VERSION)" ] || { echo "usage: make release VERSION=x.y.z" >&2; exit 2; }
+	./scripts/build-release.sh $(VERSION)
+
 .PHONY: lists
 lists: ## prepare .run/lists for lab renders and nginx -t
 	mkdir -p .run/lists && cp data/ip-reputation/*.txt .run/lists/ && cp data/ip-reputation/custom-test.txt .run/lists/custom-reputation.txt && printf '2001:db8:bad::/48\n' >> .run/lists/custom-reputation.txt && printf '# placeholder\n' > .run/lists/HostingProviderIPList.txt

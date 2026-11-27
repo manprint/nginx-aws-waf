@@ -290,3 +290,23 @@
   - T-MN4: renew skips while the cert is fresh; `--force` issues a new serial, the old one shows `renewed`, and traffic flows.
   - T-MN5: revoke reloads the ingress; after 20 s there are 0 events, and the ingress logs "certificate revoked".
   - Cleanup: re-enroll delivers the 20 buffered events (disk buffer, no loss).
+
+## 5.4 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW node/bootstrap.go and templates/{gitignore,node.yaml.tmpl,central.yaml.tmpl,default-wafctl,sites-README.md} (embedded).
+  - `Bootstrap` validates node-id, role, network and central. It refuses if node.yaml exists unless `--force`.
+  - It writes .gitignore (plan lines plus `secrets.env.tmp`), node.yaml, sites/README.md and profiles/.gitkeep. Central roles also get central.yaml (ingress.server_names = `--central`) and a 0600 apprise-urls.txt stub, which is git-ignored.
+  - It runs `secrets.Init` (0600) and creates the `$WAF_DATA_DIR` subdirs (certs/_node 0700).
+  - `--install-systemd` requires root. It copies deploy/systemd/*, writes /etc/default/wafctl, runs daemon-reload and `enable --now` on the role's units: node = bypass-expire, logs, node-renew; central = pki-crl, pki; all-in-one = everything except node-renew.
+  - It ends with `git init` and a single commit `bootstrap <id>` using a repo-local identity, then prints the next steps.
+- NEW cmd `node bootstrap`. NEW node/bootstrap_test.go (T-BS1/2), scripts/{build-release.sh,install-node.sh}, tests/e2e/bootstrap.sh. Makefile gains `release VERSION=`.
+- WRITE env.Home: falls back to the directory of the (symlink-resolved) wafctl executable, so a release installed in /opt/nginx-aws-waf works without exporting WAF_HOME.
+- build-release.sh:
+  - builds linux/amd64 with CGO off, `-trimpath` and version ldflags;
+  - ships docs/ without plans/, plus README;
+  - refuses to package `*.key`, `*.pem`, `secrets.env*` or `tokens.json`.
+- install-node.sh:
+  - root only; requires docker compose (otherwise prints the Docker URL and exits 1) and git;
+  - copies to `$WAF_HOME` and links /usr/local/bin/wafctl.
+- In the e2e, a `docker compose version` shim stands in for Docker in the container (no Docker-in-Docker). The no-Docker refusal path is tested first.
+- Not e2e-tested: `--install-systemd` (the container has no systemd). The root check and the unit lists are covered by code review only.
+- G-U54: TestBS1_/TestBS2_ PASS (2). bootstrap.sh ALL PASS (10 checks: validate rc 0, 1 commit, secrets 0600 and untracked, second run refused).

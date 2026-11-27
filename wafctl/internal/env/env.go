@@ -10,7 +10,8 @@ import (
 // CatalogRel is the catalog path relative to WAF_HOME.
 const CatalogRel = "waf/catalog/rules.yaml"
 
-// Home returns $WAF_HOME or the nearest ancestor of cwd holding waf/catalog/rules.yaml.
+// Home returns $WAF_HOME, the nearest ancestor of cwd holding waf/catalog/rules.yaml, or the
+// directory of the wafctl executable (symlinks resolved: a release installed by install-node.sh).
 func Home() (string, error) {
 	if h := os.Getenv("WAF_HOME"); h != "" {
 		return filepath.Abs(h)
@@ -25,11 +26,21 @@ func Home() (string, error) {
 		}
 		p := filepath.Dir(d)
 		if p == d {
-			return "", errors.New("WAF_HOME not set and no ancestor of cwd contains " + CatalogRel)
+			break
 		}
 		d = p
 	}
+	if exe, err := os.Executable(); err == nil {
+		if exe, err = filepath.EvalSymlinks(exe); err == nil {
+			if h := filepath.Dir(exe); fileExists(filepath.Join(h, CatalogRel)) {
+				return h, nil
+			}
+		}
+	}
+	return "", errors.New("WAF_HOME not set, no ancestor of cwd and not the wafctl directory contains " + CatalogRel)
 }
+
+func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 // ConfigDir returns $WAF_CONFIG_DIR (default /etc/waf-node).
 func ConfigDir() string { return getenv("WAF_CONFIG_DIR", "/etc/waf-node") }

@@ -1,0 +1,4 @@
+# /etc/default/wafctl — written by wafctl node bootstrap; read by the wafctl systemd units
+WAF_HOME={{.Home}}
+WAF_CONFIG_DIR={{.ConfigDir}}
+WAF_DATA_DIR={{.DataDir}}

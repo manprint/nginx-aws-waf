@@ -1,0 +1,8 @@
+# wafctl node bootstrap: never commit secrets, keys or runtime state
+state/
+secrets.env
+secrets.env.tmp
+pki/private/
+pki/tokens.json
+*.key
+apprise-urls.txt

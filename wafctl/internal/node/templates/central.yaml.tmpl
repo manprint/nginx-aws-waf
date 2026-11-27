@@ -1,0 +1,8 @@
+# central.yaml — written by wafctl node bootstrap ({{.Date}}). Reference: docs/dashboards-alerts.md, docs/multi-node.md
+version: 1
+grafana: {bind: "127.0.0.1:3000", root_url: "http://localhost:3000/"}
+alerts: {block_spike_per_5m: 500, fail_per_5m: 1, node_silent_min: 3, ingest_lag_min: 5, disagreement_per_5m: 200}
+apprise: {urls_file: apprise-urls.txt}   # one Apprise URL per line (not committed: it holds credentials)
+clickhouse: {raw_days: 30, agg_days: 400}
+# server_names/server_ips: the names the nodes use as central.address (they go into the ingress cert)
+ingress: {bind: "0.0.0.0", ingest_port: 6000, pki_port: 6001, server_names: [{{.CentralName}}], server_ips: []}

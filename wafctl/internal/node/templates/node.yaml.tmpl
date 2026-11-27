@@ -1,0 +1,13 @@
+# node.yaml — written by wafctl node bootstrap ({{.Date}}). Reference: docs/config-reference.md
+version: 1
+node_id: {{.NodeID}}
+role: {{.Role}}
+network: {{.Network}}
+listen: {http: 80, https: 443, ipv6: true}
+workers: 0          # 0 = one per CPU
+geoip: {enabled: false}
+audit: {scope: all}
+{{- if .Central}}
+central: {address: {{.Central}}, ingest_port: 6000, pki_port: 6001}
+{{- end}}
+retention: {raw_days: 7, log_hours: 24}
