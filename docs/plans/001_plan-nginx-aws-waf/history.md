@@ -441,3 +441,45 @@
   - List safety: validate-all-before-install, the 50 % guard, tmp+rename, custom-reputation never overwritten, offline → kept rc 0.
   - Docs: aws-export.md, operations.md, multi-node.md, README, CHANGELOG, tests/README.
 - **G-P6:** `make test-unit` 16 ok, then `make final-check` 8 × G-FINAL step N OK (events in 6.0 s, alert after 180 s, shop18.tf VALID with lossy=xff).
+
+## 27-11-2026 PLAN/1 STATE compaction (moved detail)
+§2 Readiness: READY rev 1. agent-1 validated all 7 phase files, 39 sub-phases, the dependencies and the gate registry against the quality checklist ("Plan readiness"). Open questions: none. Required unverified claims: none. R1, R3, R5-addendum and R6-residual are `ACCEPTED (autonomous)` with guards (overview).
+
+§10 Do-not-repeat at PLAN close:
+- Do not put site grp/act/path-override vars in phase 1. Site-file rules run BEFORE main rules in every phase (R2 re-probe, `/tmp/pevo`), so main defaults would overwrite them.
+- Do not write the audit log inside the container overlay fs (R8: 10× slower). Always use the bind-mounted `/var/log/waf`.
+- Do not use go-ftw (D24). Do not use the Grafana `toJson`/`ternary` template funcs (R6).
+- Do not expect `aws wafv2 get-web-acl` / `describe-managed-rule-group` to work: IAM `enforce-mfa` explicit deny. Optional R1 check (not a gate): `aws sts get-session-token --serial-number <mfa-arn> --token-code <otp>`, export the creds, then run `scripts/fetch-aws-rulegroups.sh`. If priorities differ, reorder the catalog groups (plan revision).
+- Do not let an expired CRL stay on the ingress: nginx then rejects every node (R10).
+- Do not expect `nginx -s reload` to reopen the ModSecurity audit log (handles keyed by path survive reloads); rotation flips the audit slot (1.7). `nginx -s reload` is asynchronous: wait on `127.0.0.1:8090/__rev` (1.5).
+- Do not log `$request_method` (GET after the error_page redirect of a block); use `$waf_method` (1.7).
+- Grafana file provisioning expands `$NAME` in contact-point settings: write `$$` (4.3).
+- Grafana custom `allValue` is inserted verbatim (no :format): quote it in the value (4.2).
+- A changed nginx `listen` address cannot be reloaded (EADDRINUSE): restart the waf container (4.1).
+- Do not rename the node Vector file source id: a new id has no checkpoint and re-reads the current logs (duplicate events, P3 review).
+- libmodsecurity 3 `@ipMatch` rejects an IPv6 `/128` (nginx -t "Rules error"): render full-length prefixes as bare addresses (6.3, `render/conds.go ipMatchList`).
+- Do not drop the node Vector file source `max_read_bytes: 1048576`: the 2048 B default delays bursts with audit bodies by about 7 s (G-FINAL step 3, 6.5).
+- Grafana/Alertmanager dedups a group that resolved and re-fired within group_interval (no "resolved" sent in between) until repeat_interval 4h. T-AL5 waits for the demo "resolved" notification before the spike (6.5/P6).
+- Vector 0.62 (3.1): `${VAR}` in config needs VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true; the `vector` sink needs an `http://` address (no scheme = TLS); `geoip` table rejects Country DBs → `type: mmdb`; idle file sources back off up to ~8 s each → node reads access+audit with ONE file source and the join uses `max_events: 2`.
+
+## 27-11-2026 PLAN/1 complete (commit below)
+- **Gates:**
+  - G-FINAL: `make final-check` gives 8 × `G-FINAL step N OK` on HEAD 4839dea + the P6 fix, the tree committed as 49bacd7. Corpus 67/67, legit 12 passed, 67 events in ClickHouse in 6.0 s, 31 dashboard queries OK, report 30 KB self-contained, AWS log export 396918 lines all with requestId, bypass (attack 404 + shadow_action=BLOCK, 403 after clear), block spike alert delivered after 180 s, shop18.tf VALID with lossy only `client_ip.source=xff`.
+  - G-PERF: `scripts/bench.sh` exit 0. GET 5277 rps with p99 2.80 ms; POST 4596 rps with p99 3.07 ms; RSS 70–72 MB.
+  - G-SEC: nothing secret is staged or tracked (no .key/.pem/secrets.env/tokens/tfstate/tfvars).
+  - make test-unit: 16 packages ok.
+- **Checks:** every phase P0–P6 is DONE with no SKIPPED unit. The README obligations are met. No open corrections, audits or blockers.
+- **Final review (agent-1:opus, self-review).** The reference scenario is reproduced end to end on the lab. The plan's goal is met:
+  - one-click ACL simulation with per-rule Count, aws-compatible/nginx-only classification, Odoo profiles;
+  - full observability: ClickHouse, CLI, HTML report, Grafana with apprise alerts;
+  - multi-node mTLS with PKI lifecycle;
+  - AWS export to JSON/Terraform validated offline;
+  - IP list maintenance.
+- **Residual risks (accepted, documented):**
+  - R1: managed group priorities are unverified because of the IAM MFA deny. An optional check exists.
+  - AWS-proprietary patterns are approximated, with fidelity marked per rule.
+  - CVE-2025-55182 pattern approximate.
+  - Rate limiting is a leaky bucket, not a sliding window (D14).
+  - The geoip timer needs a MaxMind account.
+  - The ingest-lag alert also fires on idle lab sites (documented).
+- STATE compacted to its final form.

@@ -1,22 +1,22 @@
 # nginx AWS WAF — State
 
 Format: pev-state 2
-Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn branch `main` (no commits; unit 0.1 makes the first commit) · updated 27-11-2026 00:46 UTC by agent-1:opus
+Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn branch `main` (no commits; unit 0.1 makes the first commit) · updated 27-11-2026 03:50 UTC by agent-1:opus
 §0 Protocol: without this skill read PROTOCOL.md once. History: history.md (append-only, never read to resume).
 
 ## 1. Now
-- Run: execute 001 · result RUNNING · style handoff · acting as agent-1:opus
+- Run: execute 001 · result COMPLETE · style handoff · acting as agent-1:opus
 - Settings: autonomy true (plan) · WIP on (plan) · deadline none
 - Stop latch: none
-- Scope: plan 001 · RUNNING · overrides none
-- Unit: plan PLAN/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
-- Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
-- Last closure: unit:P6:1
-- Next: close PLAN (G-FINAL) · next eligible: PLAN
+- Scope: plan 001 · COMPLETE · overrides none
+- Unit: none
+- Base: HEAD 49bacd7 + clean tree · branch main · last WIP tree none
+- Last closure: unit:PLAN:1
+- Next: none (plan 001 COMPLETE)
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
-READY rev 1. agent-1 validated all 7 phase files, 39 sub-phases, the dependencies and the gate registry against the quality checklist ("Plan readiness"). Open questions: none. Required unverified claims: none. R1, R3, R5-addendum and R6-residual are `ACCEPTED (autonomous)` with guards (overview).
+none
 
 ## 3. Settings, roster, gates
 - **Roster:** agent-1:opus (supervisor and sole implementer; reviews are labelled `self-review`).
@@ -103,21 +103,7 @@ none
 none
 
 ## 10. Do-not-repeat
-- Do not put site grp/act/path-override vars in phase 1. Site-file rules run BEFORE main rules in every phase (R2 re-probe, `/tmp/pevo`), so main defaults would overwrite them.
-- Do not write the audit log inside the container overlay fs (R8: 10× slower). Always use the bind-mounted `/var/log/waf`.
-- Do not use go-ftw (D24). Do not use the Grafana `toJson`/`ternary` template funcs (R6).
-- Do not expect `aws wafv2 get-web-acl` / `describe-managed-rule-group` to work: IAM `enforce-mfa` explicit deny. Optional R1 check (not a gate): `aws sts get-session-token --serial-number <mfa-arn> --token-code <otp>`, export the creds, then run `scripts/fetch-aws-rulegroups.sh`. If priorities differ, reorder the catalog groups (plan revision).
-- Do not let an expired CRL stay on the ingress: nginx then rejects every node (R10).
-- Do not expect `nginx -s reload` to reopen the ModSecurity audit log (handles keyed by path survive reloads); rotation flips the audit slot (1.7). `nginx -s reload` is asynchronous: wait on `127.0.0.1:8090/__rev` (1.5).
-- Do not log `$request_method` (GET after the error_page redirect of a block); use `$waf_method` (1.7).
-- Grafana file provisioning expands `$NAME` in contact-point settings: write `$$` (4.3).
-- Grafana custom `allValue` is inserted verbatim (no :format): quote it in the value (4.2).
-- A changed nginx `listen` address cannot be reloaded (EADDRINUSE): restart the waf container (4.1).
-- Do not rename the node Vector file source id: a new id has no checkpoint and re-reads the current logs (duplicate events, P3 review).
-- libmodsecurity 3 `@ipMatch` rejects an IPv6 `/128` (nginx -t "Rules error"): render full-length prefixes as bare addresses (6.3, `render/conds.go ipMatchList`).
-- Do not drop the node Vector file source `max_read_bytes: 1048576`: the 2048 B default delays bursts with audit bodies by about 7 s (G-FINAL step 3, 6.5).
-- Grafana/Alertmanager dedups a group that resolved and re-fired within group_interval (no "resolved" sent in between) until repeat_interval 4h. T-AL5 waits for the demo "resolved" notification before the spike (6.5/P6).
-- Vector 0.62 (3.1): `${VAR}` in config needs VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true; the `vector` sink needs an `http://` address (no scheme = TLS); `geoip` table rejects Country DBs → `type: mmdb`; idle file sources back off up to ~8 s each → node reads access+audit with ONE file source and the join uses `max_events: 2`.
+none
 
 ## 11. Board
 | Phase | Status | Attempt | Sub-phases | Closure ref |
@@ -129,31 +115,9 @@ none
 | 4 | DONE | 1 | 4.1–4.4 | unit:P4:1 |
 | 5 | DONE | 1 | 5.1–5.5 | unit:P5:1 |
 | 6 | DONE | 1 | 6.1–6.5 | unit:P6:1 |
-| PLAN | IN_PROGRESS | 1 | — | — |
+| PLAN | DONE | 1 | — | unit:PLAN:1 |
 
-Phase 1: DONE (unit:P1:1), 1.1–1.9 DONE attempt 1.
-
-Phase 2: DONE (unit:P2:1), 2.1–2.5 DONE attempt 1.
-
-Phase 3: DONE (unit:P3:1), 3.1–3.6 DONE attempt 1.
-
-Phase 4: DONE (unit:P4:1), 4.1–4.4 DONE attempt 1.
-
-Phase 5: DONE (unit:P5:1), 5.1–5.5 DONE attempt 1.
-
-Phase 6: DONE (unit:P6:1), 6.1–6.5 DONE attempt 1.
-
-Phase 6 (expanded):
-| ID | Depends | Status | Attempt | Assigned | Ref / note |
-|----|---------|--------|---------|----------|------------|
-| 6.1 | P1, P3 | DONE | 1 | agent-1 | unit:6.1:1 |
-| 6.2 | 6.1 | DONE | 1 | agent-1 | unit:6.2:1 |
-| 6.3 | 6.2 | DONE | 1 | agent-1 | unit:6.3:1 |
-| 6.4 | 6.3 | DONE | 1 | agent-1 | unit:6.4:1 |
-| 6.5 | 6.4 | DONE | 1 | agent-1 | unit:6.5:1 |
-| P6 | 6.1–6.5 | DONE | 1 | agent-1 | unit:P6:1 |
-
-README obligation: 1.9 (README rewrite), then 2.5, 3.6, 4.4, 5.5 and 6.5 add sections.
+README obligation: fulfilled (1.9, 2.5, 3.6, 4.4, 5.5, 6.5).
 Open corrections: none. Open audits: none.
 Statuses: TODO, IN_PROGRESS, IN_REVIEW, DONE, SKIPPED (reason kept), BLOCKED.
 
