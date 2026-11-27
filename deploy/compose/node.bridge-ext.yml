@@ -1,0 +1,7 @@
+# Second node on the same host (compose project ≠ waf, e.g. waf2 in the lab): its own bridge
+# network, so the service-name aliases (waf, shop*.lab.test) do not collide with project waf.
+# Picked by wafctl after $WAF_COMPOSE_EXTRA when WAF_COMPOSE_PROJECT ≠ waf.
+networks:
+  lab:
+    name: ${WAF_COMPOSE_PROJECT}_lab
+    external: false

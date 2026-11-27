@@ -1,16 +1,20 @@
 package central
 
 import (
+	"bytes"
 	"context"
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"nginxawswaf/wafctl/internal/pki"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -170,5 +174,63 @@ func TestAL2_AppriseSkipsComments(t *testing.T) {
 	empty, _ := Files(Defaults(), t.TempDir())
 	if string(empty["apprise/waf.yml"]) != "# Rendered by wafctl central render from the apprise URLs file — do not edit.\nurls: []\n" {
 		t.Errorf("empty: %s", empty["apprise/waf.yml"])
+	}
+}
+
+func TestING1_IngressRender(t *testing.T) {
+	golden(t, "ingress-nginx.conf", IngressConf())
+	now := time.Date(2026, 11, 27, 10, 0, 0, 0, time.UTC)
+	s := &pki.Store{Dir: filepath.Join(t.TempDir(), "pki"), Now: func() time.Time { return now }}
+	if err := s.Init("t"); err != nil {
+		t.Fatal(err)
+	}
+	c := Defaults()
+	c.Ingress.ServerNames = []string{"central.lab.test", "ingress"}
+	out := t.TempDir()
+	if ch, err := RenderIngress(c, s, out, now); err != nil || !ch {
+		t.Fatalf("first render %v %v", ch, err)
+	}
+	dir := IngressCertsDir(out)
+	ents, _ := os.ReadDir(dir)
+	var names []string
+	for _, e := range ents {
+		names = append(names, e.Name())
+	}
+	if strings.Join(names, ",") != "ca.pem,crl.pem,ingress.key,ingress.pem" {
+		t.Errorf("certs dir %v (the CA key must never be copied)", names)
+	}
+	if st, _ := os.Stat(filepath.Join(dir, "ingress.key")); st.Mode() != 0o600 {
+		t.Errorf("ingress.key mode %v", st.Mode())
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "ingress.pem"))
+	cert, _ := pki.ParseCertPEM(b)
+	if strings.Join(cert.DNSNames, ",") != "central.lab.test,ingress" || cert.ExtKeyUsage[0] != x509.ExtKeyUsageServerAuth {
+		t.Errorf("sans %v eku %v", cert.DNSNames, cert.ExtKeyUsage)
+	}
+	if ch, _ := RenderIngress(c, s, out, now); ch {
+		t.Errorf("second render changed")
+	}
+	c.Ingress.ServerIPs = []string{"192.0.2.10"}
+	if ch, _ := RenderIngress(c, s, out, now); !ch {
+		t.Errorf("SAN change did not reissue")
+	}
+	if ch, _ := RenderIngress(c, s, out, now.Add(61*24*time.Hour)); !ch {
+		t.Errorf("expiring cert (29 d left) not reissued")
+	}
+	s.Revoke("ingress")
+	if ch, _ := PublishCRL(s, out); !ch {
+		t.Errorf("new CRL not published")
+	}
+	if ch, _ := PublishCRL(s, out); ch {
+		t.Errorf("unchanged CRL republished")
+	}
+	pb, _ := os.ReadFile(filepath.Join(s.Dir, "crl.pem"))
+	ib, _ := os.ReadFile(filepath.Join(dir, "crl.pem"))
+	if !bytes.Equal(pb, ib) {
+		t.Errorf("published crl differs")
+	}
+	c.Ingress.Bind = "x"
+	if errs, _ := c.Validate(t.TempDir()); len(errs) == 0 {
+		t.Errorf("bad ingress.bind accepted")
 	}
 }

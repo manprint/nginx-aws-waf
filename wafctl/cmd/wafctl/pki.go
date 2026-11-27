@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"nginxawswaf/wafctl/internal/central"
+	"nginxawswaf/wafctl/internal/config"
 	"os"
 	"path/filepath"
 	"text/tabwriter"
@@ -177,5 +179,36 @@ func writeCertFiles(dir, name string, cert, key, ca []byte) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func init() {
+	pkiAfterCRL = publishCRL
+}
+
+// publishCRL copies crl.pem to the ingress certs dir and reloads the ingress when it runs.
+func publishCRL(s *pki.Store) error {
+	if _, err := os.Stat(central.IngressCertsDir(env.CentralDir())); err != nil {
+		return nil // no ingress rendered on this host (yet): nothing to publish
+	}
+	changed, err := central.PublishCRL(s, env.CentralDir())
+	if err != nil || !changed {
+		return err
+	}
+	cfg, err := config.Load(env.ConfigDir())
+	if err != nil {
+		return fmt.Errorf("crl copied to the ingress; reload it by hand (%v)", err)
+	}
+	eng, err := newEngine(cfg.Node)
+	if err != nil {
+		return err
+	}
+	if up, _ := eng.Running("ingress"); !up {
+		return nil
+	}
+	if out, err := eng.Exec("ingress", "nginx", "-c", "/etc/waf/ingress/nginx.conf", "-s", "reload"); err != nil {
+		return fmt.Errorf("ingress reload: %v: %s", err, out)
+	}
+	fmt.Fprintln(os.Stderr, "crl published to the ingress, ingress reloaded")
 	return nil
 }

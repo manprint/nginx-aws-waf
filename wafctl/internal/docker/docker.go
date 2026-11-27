@@ -48,6 +48,8 @@ func Files(role, network string) []string {
 		f := append(node, "central.yml")
 		if network == "bridge" {
 			f = append(f, "central.bridge.yml")
+		} else {
+			f = append(f, "central.host.yml")
 		}
 		return f
 	}
@@ -83,6 +85,10 @@ func NewCompose(p Params) (*Compose, error) {
 	proj := os.Getenv("WAF_COMPOSE_PROJECT")
 	if proj == "" {
 		proj = "waf"
+	}
+	if proj != "waf" && p.Network == "bridge" && p.Role != "central" {
+		// second node on the same host: own network (after the extras, which may name waf_lab)
+		files = append(files, filepath.Join(d, "node.bridge-ext.yml"))
 	}
 	c := &Compose{Project: proj, Files: files, Env: []string{"WAF_DATA_DIR=" + p.DataDir, "WAF_CONFIG_DIR=" + p.ConfigDir,
 		"WAF_CENTRAL_DIR=" + p.CentralDir, "WAF_NODE_ID=" + p.NodeID}}

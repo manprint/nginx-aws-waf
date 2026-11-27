@@ -237,3 +237,30 @@
 - Shape decisions (non-weakening): index.json is `{"crl_number": n, "certs": [...]}` (the plan lists both an entry array and an index-level crl_number); `revoke <cn>` revokes every non-revoked cert of that CN; `SignCSR` (CSR signature, CN match, P-256 only) is added now for 5.3; `pkiAfterCRL` hook left for 5.2 (copy CRL to ingress + reload); CN restricted to `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`; token ttl ≤ 720h; leaf NotAfter capped at the CA's.
 - Self-review (security): crypto/rand only; file modes checked by tests and pki.sh; client cert rejected for ServerAuth (Go + openssl -purpose); CA key never printed or copied.
 - G-U51: TestPKI1_..TestPKI5_ PASS (5); openssl verify OK, CRL lists the revoked serial and `openssl verify -crl_check` → "certificate revoked" (pki.sh ALL PASS).
+
+## 5.2 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW wafctl/internal/central/ingress.go:
+  - `Ingress{bind, ingest_port, pki_port, server_names, server_ips}` in central.yaml; default 0.0.0.0:6000/6001; validated.
+  - `IngressConf`: the R10 probe shape, i.e. stream, `ssl_alpn h2`, `ssl_verify_client on`, `ssl_crl`, `verify_depth 1`, proxy to vector-central:6000.
+  - `RenderIngress` writes `$WAF_CENTRAL_DIR/ingress/{nginx.conf,certs/{ingress.pem,ingress.key 0600,ca.pem,crl.pem}}` and never copies the CA key. The server cert (CN ingress, SANs = server_names+ingress, server_ips) is reissued if missing, expiring in < 30 d, from another CA, or if the SANs changed.
+  - `PublishCRL`.
+- NEW compose files:
+  - service `ingress` in central.yml, published on `${INGRESS_BIND}:${INGRESS_PORT}`;
+  - central.host.yml, which moves vector-central for the local all-in-one node to 127.0.0.1:6100 (6000 is now the ingress, and vector-central is no longer published);
+  - node.bridge-ext.yml, a separate network for a second compose project on the same host;
+  - lab-node2.yml, which adds `extra_hosts central.lab.test:host-gateway` so node 2 goes through the host like a remote node.
+- NEW deploy/systemd/wafctl-pki-crl.{service,timer} (daily, R10). NEW lab/config-node2/{node.yaml,sites/demo.yaml}. NEW tests/e2e/multinode.sh (part1).
+- WRITE:
+  - render/vector.go: role node → `tls {enabled, crt_file, key_file, ca_file: /etc/waf/certs/_node/*, verify_hostname: true}`; all-in-one stays plain on the local network.
+  - node.yml: vector mounts `$WAF_DATA_DIR/certs/_node`, which apply creates with mode 0700.
+  - node.bridge.yml: ports follow node.yaml listen via WAF_HTTP(S)_PORT.
+  - engine.go: exports those ports plus INGRESS_BIND/PORT.
+  - cmd apply.go: renderCentral needs the PKI (clear error otherwise) and adds "ingress" to the changed services.
+  - pki.go: `pkiAfterCRL` publishes the CRL and runs `nginx -s reload` in the ingress.
+  - Makefile: lab-up creates the lab CA.
+  - lab central.yaml: ingress server_names [ingress, central.lab.test].
+  - .gitignore: lab pki dirs.
+  - docs/observability.md, tests/README.md.
+- Decision (non-weakening): all-in-one keeps the local hop in plaintext, either on the compose network or on loopback, because both ends run on the same host. Every remote hop uses mTLS.
+- Stream access log lines are written at session end, and Vector's session is long-lived. So the ingress is verified with openssl handshake probes: no cert → `"-" NONE 500`, node cert → `CN=lab-node-2 SUCCESS 200`.
+- G-U52: TestING1_ + TestFWD1_ PASS (2). multinode.sh part1 ALL PASS: T-MN1 delivered 20/20 node-2 events to ClickHouse through the ingress. Regression: central/smoke/apply/metrics ALL PASS. `wafctl pki crl` → CRL published and the ingress reloaded.

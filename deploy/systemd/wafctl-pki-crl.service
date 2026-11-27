@@ -1,0 +1,8 @@
+[Unit]
+Description=Regenerate the WAF CRL and reload the mTLS ingress (wafctl pki crl)
+After=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/wafctl
+ExecStart=/usr/local/bin/wafctl pki crl

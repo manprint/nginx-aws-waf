@@ -27,12 +27,16 @@ nginx + ModSecurity ──► logs/access.log  (JSON, una riga per richiesta)
 
 | Ruolo | Destinazione |
 |---|---|
-| `all-in-one` (bridge) | `vector-central:6000` |
-| `all-in-one` (host) | `127.0.0.1:6000` |
-| `node` | `central.address:central.ingest_port` (IPv6 ammesso) |
+| `all-in-one` (bridge) | `vector-central:6000`, in chiaro sulla rete locale |
+| `all-in-one` (host) | `127.0.0.1:6100`, in chiaro su loopback |
+| `node` | `central.address:central.ingest_port` (IPv6 ammesso), **mTLS** |
 | nessun indirizzo | blackhole: restano solo i file `raw/` |
 
-Il canale nodo → centrale ora è HTTP in chiaro. La fase 5 lo porta su mTLS.
+Un nodo remoto (`role: node`) si collega all'ingress mTLS del centrale: il sink usa
+`tls {crt_file, key_file, ca_file, verify_hostname: true}` con il certificato client in
+`$WAF_DATA_DIR/certs/_node/{node.pem,node.key,ca.pem}`. Per questo `central.address` deve essere
+uno dei nomi (o IP) del certificato server dell'ingress (`ingress.server_names` / `server_ips` in
+`central.yaml`).
 
 Latenza tipica a regime: 4–8 s da richiesta a riga in ClickHouse. Il primo evento dopo un periodo
 di inattività può arrivare fino a circa 13 s dopo, perché le sorgenti file e il buffer su disco di
@@ -40,10 +44,27 @@ Vector fanno backoff quando sono inattivi.
 
 ## Stack centrale
 
-`deploy/compose/central.yml` contiene `clickhouse` (HTTP `127.0.0.1:8123`) e `vector-central`
-(ingest `127.0.0.1:6000`). In modalità all-in-one bridge, `central.bridge.yml` li collega anche
-alla rete `waf_lab`. I dati stanno in `$WAF_CENTRAL_DIR` (default `$WAF_DATA_DIR/central`):
-`clickhouse/` e `vector/`.
+`deploy/compose/central.yml` contiene `clickhouse` (HTTP `127.0.0.1:8123`), `vector-central`
+(ingest in chiaro sulla porta 6000, non pubblicata) e `ingress`. L'ingress è un nginx `stream`
+pubblicato su `ingress.bind:ingress.ingest_port` (default `0.0.0.0:6000`). Termina l'mTLS
+(`ssl_verify_client on`, `ssl_crl`, ALPN `h2`) e inoltra a `vector-central:6000`.
+
+`wafctl apply` (e `wafctl central render`) genera `$WAF_CENTRAL_DIR/ingress/`:
+
+- `nginx.conf`;
+- `certs/`, con `ingress.pem`/`ingress.key`, `ca.pem` e `crl.pem`. La chiave della CA non viene
+  mai copiata qui.
+
+Il certificato server viene riemesso se manca, se scade entro 30 giorni o se cambiano i SAN.
+
+`wafctl pki revoke` e `wafctl pki crl` copiano la nuova CRL e ricaricano l'ingress. Installare il
+timer `deploy/systemd/wafctl-pki-crl.timer` (giornaliero): la CRL vale 7 giorni e, se scade, nginx
+rifiuta tutti i nodi.
+
+In modalità all-in-one bridge, `central.bridge.yml` collega anche `vector-central` e `ingress` alla
+rete `waf_lab`. In modalità host, `central.host.yml` pubblica `vector-central` su
+`127.0.0.1:6100` per il nodo locale. I dati stanno in `$WAF_CENTRAL_DIR` (default
+`$WAF_DATA_DIR/central`): `clickhouse/`, `vector/` e `ingress/`.
 
 Utenti ClickHouse (le password stanno in `$WAF_CONFIG_DIR/secrets.env`, generate da
 `wafctl secrets init`, permessi 0600, mai in git):

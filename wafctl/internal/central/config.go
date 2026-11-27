@@ -23,6 +23,7 @@ type Config struct {
 	Alerts     Alerts     `yaml:"alerts"`
 	Apprise    Apprise    `yaml:"apprise"`
 	ClickHouse ClickHouse `yaml:"clickhouse"`
+	Ingress    Ingress    `yaml:"ingress"`
 	File       string     `yaml:"-"`
 }
 
@@ -62,6 +63,7 @@ func Defaults() Config {
 		Alerts:     Alerts{BlockSpikePer5m: 500, FailPer5m: 1, NodeSilentMin: 3, IngestLagMin: 5, DisagreementPer5m: 200},
 		Apprise:    Apprise{URLsFile: "apprise-urls.txt"},
 		ClickHouse: ClickHouse{RawDays: 30, AggDays: 400},
+		Ingress:    Ingress{Bind: "0.0.0.0", IngestPort: 6000, PKIPort: 6001, ServerNames: []string{"central.example.com"}},
 	}
 }
 
@@ -122,6 +124,7 @@ func (c Config) Validate(configDir string) (errs, warns []string) {
 	if c.ClickHouse.AggDays < c.ClickHouse.RawDays || c.ClickHouse.AggDays > 3650 {
 		errs = append(errs, "clickhouse.agg_days must be >= raw_days and <= 3650")
 	}
+	errs = append(errs, c.Ingress.validate()...)
 	if c.Apprise.URLsFile == "" || filepath.IsAbs(c.Apprise.URLsFile) || filepath.Base(c.Apprise.URLsFile) != c.Apprise.URLsFile {
 		errs = append(errs, fmt.Sprintf("apprise.urls_file %q: want a file name in $WAF_CONFIG_DIR", c.Apprise.URLsFile))
 	} else if urls, err := ReadURLs(filepath.Join(configDir, c.Apprise.URLsFile)); err != nil || len(urls) == 0 {

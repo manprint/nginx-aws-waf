@@ -4,6 +4,8 @@ services:
     networks: [central, lab]
   vector-central:
     networks: [central, lab]
+  ingress:
+    networks: [central, lab]
 networks:
   lab:
     name: waf_lab

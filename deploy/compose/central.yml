@@ -38,9 +38,23 @@ services:
       - ../vector/central.yaml:/etc/vector/vector.yaml:ro
       - ${WAF_CENTRAL_DIR}/vector:/var/lib/vector
       - ${WAF_DATA_DIR}/geoip:/etc/waf/geoip:ro
-    ports: ["127.0.0.1:6000:6000"]
+    # not published: remote nodes come through the mTLS ingress; all-in-one bridge uses the
+    # shared network, all-in-one host uses central.host.yml (127.0.0.1:6100)
     depends_on:
       clickhouse: {condition: service_healthy}
+    networks: [central]
+  ingress:   # mTLS entry for remote nodes (R10): nginx stream → vector-central:6000
+    image: owasp/modsecurity-crs:4.30.0-nginx-alpine-202611190211
+    entrypoint: ["nginx", "-g", "daemon off;", "-c", "/etc/waf/ingress/nginx.conf"]
+    user: root    # the master reads the 0600 key; workers drop to nginx
+    restart: unless-stopped
+    healthcheck: {disable: true}
+    tmpfs: [/tmp]
+    volumes:
+      - ${WAF_CENTRAL_DIR}/ingress/nginx.conf:/etc/waf/ingress/nginx.conf:ro
+      - ${WAF_CENTRAL_DIR}/ingress/certs:/etc/waf/pki:ro   # ingress.pem/.key, ca.pem, crl.pem only (never the CA key)
+    ports: ["${INGRESS_BIND:-0.0.0.0}:${INGRESS_PORT:-6000}:6000"]
+    depends_on: [vector-central]
     networks: [central]
   prometheus:
     image: prom/prometheus:v3.16.0

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily WAF CRL regeneration (the CRL is valid 7 days; an expired CRL rejects every node)
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target

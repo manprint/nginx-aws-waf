@@ -14,7 +14,7 @@ func TestC0_ForwardRender(t *testing.T) {
 		want string
 	}{
 		{config.Node{Role: "all-in-one", Network: "bridge"}, "vector-central:6000"},
-		{config.Node{Role: "all-in-one", Network: "host"}, "127.0.0.1:6000"},
+		{config.Node{Role: "all-in-one", Network: "host"}, "127.0.0.1:6100"},
 		{config.Node{Role: "node", Network: "host", Central: config.Central{Address: "10.0.0.5", IngestPort: 6000}}, "10.0.0.5:6000"},
 		{config.Node{Role: "node", Network: "host"}, ""},
 	}
@@ -32,12 +32,27 @@ func TestC0_ForwardRender(t *testing.T) {
 			if !strings.Contains(y, "type: blackhole") || strings.Contains(y, "fwd_central") {
 				t.Errorf("unconfigured: %s", y)
 			}
-		} else if !strings.Contains(y, `address: "http://`+r.want+`"`) || !strings.Contains(y, "when_full: block") {
+		} else if r.n.Role == "all-in-one" && (!strings.Contains(y, `address: "http://`+r.want+`"`) || !strings.Contains(y, "when_full: block") || strings.Contains(y, "tls:")) {
 			t.Errorf("configured: %s", y)
 		}
 	}
 	if got := CentralAddress(&config.Node{Role: "node", Central: config.Central{Address: "fd00::5", IngestPort: 6000}}); got != "[fd00::5]:6000" {
 		t.Errorf("ipv6 address: %q", got)
+	}
+}
+
+func TestFWD1_NodeForwardTLS(t *testing.T) {
+	n := config.Node{NodeID: "lab-node-2", Role: "node", Network: "bridge", Central: config.Central{Address: "central.lab.test", IngestPort: 6000}}
+	y := string(forwardYAML(&n))
+	want := `  fwd_central:
+    type: vector
+    inputs: [fwd_events, fwd_matches, fwd_hb, m_tag]
+    address: "central.lab.test:6000"
+    tls: {enabled: true, crt_file: /etc/waf/certs/_node/node.pem, key_file: /etc/waf/certs/_node/node.key, ca_file: /etc/waf/certs/_node/ca.pem, verify_hostname: true}
+    buffer: {type: disk, max_size: 2147483648, when_full: block}
+`
+	if !strings.HasSuffix(y, want) || strings.Contains(y, "http://central") {
+		t.Errorf("node forward:\n%s", y)
 	}
 }
 

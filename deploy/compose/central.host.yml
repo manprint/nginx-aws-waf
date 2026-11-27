@@ -1,0 +1,5 @@
+# All-in-one host mode: the local node Vector reaches vector-central in plain on 127.0.0.1:6100
+# (6000 belongs to the mTLS ingress, published for the remote nodes).
+services:
+  vector-central:
+    ports: ["127.0.0.1:6100:6000"]

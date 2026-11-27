@@ -13,6 +13,8 @@ Tutti i comandi partono dalla root del repo dopo `source scripts/lab-env.sh`.
 | Metriche | `tests/e2e/metrics.sh` | target Prometheus up, metriche nginx e host per `node_id` |
 | Grafana | `tests/e2e/grafana.sh`, `scripts/check-dashboards.sh` | dashboard, datasource, utenti, ogni query dei pannelli |
 | Alert | `tests/e2e/alerts.sh` | regole sane, test del contact point, picco di blocchi → notifica all'`alert-sink` (~4 min) |
+| PKI | `tests/e2e/pki.sh` | CA, certificati client/server, revoca e CRL verificati con `openssl` (directory temporanea) |
+| Multi-nodo | `tests/e2e/multinode.sh [part1]` | secondo nodo `waf2` (`.run2`, porta 18080) che inoltra via mTLS all'ingress; l'ingress rifiuta i client senza certificato |
 
 ## Corpus (`tests/corpus/*.yaml`)
 

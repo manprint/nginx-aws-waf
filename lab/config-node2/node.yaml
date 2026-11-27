@@ -1,0 +1,11 @@
+# Lab second node (compose project waf2, data dir .run2): forwards over mTLS to the central ingress.
+version: 1
+node_id: lab-node-2
+role: node
+network: bridge
+listen: {http: 18080, https: 18443, ipv6: true}
+workers: 1
+geoip: {enabled: false}
+audit: {scope: all}
+central: {address: central.lab.test, ingest_port: 6000, pki_port: 6001}
+lab: {enabled: true}

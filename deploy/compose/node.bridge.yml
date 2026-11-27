@@ -1,6 +1,6 @@
 services:
   waf:
-    ports: ["8080:8080", "8443:8443"]
+    ports: ["${WAF_HTTP_PORT:-8080}:${WAF_HTTP_PORT:-8080}", "${WAF_HTTPS_PORT:-8443}:${WAF_HTTPS_PORT:-8443}"]   # from node.yaml listen (exported by wafctl)
     networks:
       lab:
         aliases: [waf, shop12.lab.test, shop14.lab.test, shop16.lab.test, shop18.lab.test]   # lab: Playwright reaches the sites by name

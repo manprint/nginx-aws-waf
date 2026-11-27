@@ -11,13 +11,13 @@ import (
 // CentralAddress resolves where the node Vector forwards to ("" = not configured).
 //
 //	all-in-one + bridge → vector-central:6000
-//	all-in-one + host   → 127.0.0.1:6000
+//	all-in-one + host   → 127.0.0.1:6100 (central.host.yml; 6000 is the mTLS ingress)
 //	node, central.address set → <address>:<ingest_port>
 //	otherwise → ""
 func CentralAddress(n *config.Node) string {
 	switch {
 	case n.Role == "all-in-one" && n.Network == "host":
-		return "127.0.0.1:6000"
+		return "127.0.0.1:6100"
 	case n.Role == "all-in-one":
 		return "vector-central:6000"
 	case n.Role == "node" && n.Central.Address != "":
@@ -54,14 +54,27 @@ func metricsYAML(n *config.Node) (sources, transforms string) {
 	return
 }
 
+// NodeCertDir is where the node Vector reads its client cert (mounted from $WAF_DATA_DIR/certs/_node).
+const NodeCertDir = "/etc/waf/certs/_node"
+
 // forwardYAML renders vector/forward.yaml (extra config of the node Vector).
-// The vector sink defaults to TLS without a scheme: plain http:// until P5 adds mTLS.
+// role node → mTLS to the central ingress (D26/R10); all-in-one → plain to the local vector-central.
 func forwardYAML(n *config.Node) []byte {
 	addr := CentralAddress(n)
 	src, mt := metricsYAML(n)
 	s := "# Rendered by wafctl: node metrics + node Vector → central forwarding.\n" + src + "transforms:\n" + forwardTransforms + mt + "sinks:\n"
 	if addr == "" {
 		s += "  fwd_none: {type: blackhole, inputs: [fwd_events, fwd_matches, fwd_hb, m_tag], print_interval_secs: 0}\n"
+		return []byte(s)
+	}
+	if n.Role == "node" {
+		s += fmt.Sprintf(`  fwd_central:
+    type: vector
+    inputs: [fwd_events, fwd_matches, fwd_hb, m_tag]
+    address: %q
+    tls: {enabled: true, crt_file: %s/node.pem, key_file: %s/node.key, ca_file: %s/ca.pem, verify_hostname: true}
+    buffer: {type: disk, max_size: 2147483648, when_full: block}
+`, addr, NodeCertDir, NodeCertDir, NodeCertDir)
 		return []byte(s)
 	}
 	s += fmt.Sprintf(`  fwd_central:

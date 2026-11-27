@@ -43,6 +43,7 @@ geoip-test: ## MaxMind test databases as $(WAF_DATA_DIR)/geoip/GeoLite2-{Country
 lab-min-up: wafctl lists ## start the minimal lab (WAF node + echo + central ClickHouse/Vector)
 	mkdir -p .run/runtime .run/logs .run/certs .run/geoip .run/raw .run/vector $(WAF_CENTRAL_DIR)/clickhouse $(WAF_CENTRAL_DIR)/vector $(WAF_CENTRAL_DIR)/prometheus/data $(WAF_CENTRAL_DIR)/grafana/data $(WAF_CENTRAL_DIR)/apprise
 	./wafctl/bin/wafctl secrets init
+	@[ -s $(WAF_CONFIG_DIR)/pki/ca.pem ] || ./wafctl/bin/wafctl pki init --name lab
 	@[ -s $(WAF_DATA_DIR)/geoip/GeoLite2-Country.mmdb ] || $(MAKE) geoip-test
 	./wafctl/bin/wafctl apply
 	$(COMPOSE_NODE) up -d --build --wait

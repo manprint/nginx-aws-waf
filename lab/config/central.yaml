@@ -9,3 +9,5 @@ alerts:
   disagreement_per_5m: 200
 apprise: {urls_file: apprise-urls.txt}
 clickhouse: {raw_days: 30, agg_days: 400}
+# mTLS ingress for the second lab node (project waf2 reaches it via the host as central.lab.test)
+ingress: {bind: "0.0.0.0", ingest_port: 6000, pki_port: 6001, server_names: [ingress, central.lab.test]}

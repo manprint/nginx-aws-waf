@@ -1,0 +1,5 @@
+# Lab second node (project waf2): reaches the central mTLS ingress through the host, like a remote
+# node would (central.address: central.lab.test → the ingress port published on the host).
+services:
+  vector:
+    extra_hosts: ["central.lab.test:host-gateway"]

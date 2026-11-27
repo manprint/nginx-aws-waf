@@ -3,10 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"nginxawswaf/wafctl/internal/pki"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"nginxawswaf/wafctl/internal/apply"
 	"nginxawswaf/wafctl/internal/central"
@@ -39,6 +42,10 @@ func doApply(dir string, dry bool) int {
 			return upCentral(eng, changed)
 		}
 	}
+	// mount source of the node client cert (vector); created here so docker does not create it as root
+	if err := os.MkdirAll(filepath.Join(env.DataDir(), "certs", "_node"), 0o700); err != nil {
+		return fail("%v", err)
+	}
 	rev, err := apply.Apply(p, eng, filepath.Join(env.DataDir(), "runtime"), apply.Options{DryRun: dry,
 		Log: func(s string) { fmt.Fprintln(os.Stderr, s) }})
 	if err != nil {
@@ -70,7 +77,23 @@ func renderCentral(configDir string) ([]string, error) {
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("%s: %s", central.FileName, strings.Join(errs, "; "))
 	}
-	return central.Render(c, configDir, env.CentralDir())
+	changed, err := central.Render(c, configDir, env.CentralDir())
+	if err != nil {
+		return nil, err
+	}
+	st := pki.Open(env.PKIDir())
+	if _, err := st.CACert(); err != nil {
+		return nil, fmt.Errorf("central: the mTLS ingress needs the PKI: run wafctl pki init --name <name> (WAF_PKI_DIR=%s)", st.Dir)
+	}
+	ing, err := central.RenderIngress(c, st, env.CentralDir(), time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("ingress: %w", err)
+	}
+	if ing {
+		changed = append(changed, "ingress")
+		sort.Strings(changed)
+	}
+	return changed, nil
 }
 
 // upCentral starts missing services (compose up -d is idempotent) and restarts the ones whose
