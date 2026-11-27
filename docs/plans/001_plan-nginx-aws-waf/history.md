@@ -220,3 +220,13 @@
 - NEW docs/dashboards-alerts.md (Italian): data flow, access (SSH tunnel, Tailscale via grafana.bind/root_url, no 0.0.0.0), admin password, `wafctl grafana user`, every dashboard/panel with its tuning meaning, editing dashboards (panels.py → make dashboards → check-dashboards.sh), alert table with central.yaml thresholds and grouping, ingest-lag caveat, apprise URLs for Slack/Google Chat/Telegram with wiki links + .gitignore note, lab (alert-sink, e2e scripts). WRITE README.md ("Dashboard e alert" section, dir map, docs list), docs/operations.md (GF_ADMIN_PASSWORD, central.yaml render/restart, listen-change restart), tests/README.md (e2e scripts table).
 - Fix found while checking commands: tests/e2e/grafana.sh `g()` dropped extra curl args, so the e2e user cleanup (DELETE) never ran; fixed, leftover users deleted, grafana.sh ALL PASS.
 - Copy-paste checked on the lab: `wafctl central render`, `wafctl grafana user add|list`, `grep GF_ADMIN_PASSWORD …`, `docker logs waf-alert-sink-1 | grep ALERT-SINK`, the three e2e scripts. G-U44: self-review done.
+
+## P4 attempt 1 — PHASE 4 DONE (27-11-2026 UTC, agent-1:opus)
+- G-U41..G-U44 passed (units 4.1–4.4).
+- G-P4: `make lab-up` rc=0 (full lab incl. Prometheus, Grafana, apprise, alert-sink); `scripts/check-dashboards.sh` ALL PASS; `tests/e2e/alerts.sh` ALL PASS. Also cli.sh, metrics.sh, grafana.sh ALL PASS after lab-up (the 4.3 cli.sh flake did not recur).
+- Gate strengthened during G-P4: T-AL5 matched any `[WAF] WAF block spike` line, and the first run after lab-up passed on a *resolved* notification for site tuned. Now it waits until no demo alert is firing, then requires `firing: N alert(s). site demo:` (passed: "site demo: 301 blocked requests in 5 min (threshold 20)" after 210 s).
+- Review (agent-1):
+  - secrets: none of the 4 secret values appears in tracked files or in rendered central files (datasource uses the literal `$WAF_CH_RO_PASSWORD`); secrets.env / *.pem not tracked;
+  - Grafana anonymous access off (401 on API without auth), sign-up off, published only on 127.0.0.1:3000; Prometheus and apprise not published;
+  - alerts deliver end to end (contact-point test and real spike) through apprise to the sink.
+- Residual: waf-ingest-lag fires for idle sites (documented; threshold per central.yaml).

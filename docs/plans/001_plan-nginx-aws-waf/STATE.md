@@ -9,10 +9,10 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Settings: autonomy true (plan) · WIP on (plan) · deadline none
 - Stop latch: none
 - Scope: plan 001 · RUNNING · overrides none
-- Unit: phase P4/1 · OPEN · step gates · assigned agent-1 → actual agent-1:opus
+- Unit: sub-phase 5.1/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
 - Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
-- Last closure: unit:4.4:1
-- Next: G-P4 + P4 review · next eligible: P4
+- Last closure: unit:P4:1
+- Next: open 5.1 · next eligible: 5.1
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -123,8 +123,8 @@ none
 | 1 | DONE | 1 | 1.1–1.9 | unit:P1:1 |
 | 2 | DONE | 1 | 2.1–2.5 | unit:P2:1 |
 | 3 | DONE | 1 | 3.1–3.6 | unit:P3:1 |
-| 4 | IN_PROGRESS | 1 | 4.1–4.4 | — |
-| 5 | TODO | 1 | 5.1–5.5 | — |
+| 4 | DONE | 1 | 4.1–4.4 | unit:P4:1 |
+| 5 | IN_PROGRESS | 1 | 5.1–5.5 | — |
 | 6 | TODO | 1 | 6.1–6.5 | — |
 | PLAN | TODO | 1 | — | — |
 
@@ -134,14 +134,17 @@ Phase 2: DONE (unit:P2:1), 2.1–2.5 DONE attempt 1.
 
 Phase 3: DONE (unit:P3:1), 3.1–3.6 DONE attempt 1.
 
-Phase 4 (expanded):
+Phase 4: DONE (unit:P4:1), 4.1–4.4 DONE attempt 1.
+
+Phase 5 (expanded):
 | ID | Depends | Status | Attempt | Assigned | Ref / note |
 |----|---------|--------|---------|----------|------------|
-| 4.1 | P3 | DONE | 1 | agent-1 | unit:4.1:1 |
-| 4.2 | 4.1 | DONE | 1 | agent-1 | unit:4.2:1 |
-| 4.3 | 4.2 | DONE | 1 | agent-1 | unit:4.3:1 |
-| 4.4 | 4.3 | DONE | 1 | agent-1 | unit:4.4:1 |
-| P4 | 4.1–4.4 | TODO | 1 | agent-1 | |
+| 5.1 | P3 | IN_PROGRESS | 1 | agent-1 | |
+| 5.2 | 5.1 | TODO | 1 | agent-1 | |
+| 5.3 | 5.2 | TODO | 1 | agent-1 | |
+| 5.4 | 5.3 | TODO | 1 | agent-1 | |
+| 5.5 | 5.4 | TODO | 1 | agent-1 | |
+| P5 | 5.1–5.5 | TODO | 1 | agent-1 | |
 
 README obligation: 1.9 (README rewrite), then 2.5, 3.6, 4.4, 5.5 and 6.5 add sections.
 Open corrections: none. Open audits: none.

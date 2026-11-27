@@ -34,6 +34,9 @@ check "T-AL4 contact point test delivered ($res)" bash -c "docker logs '$SINK' 2
 # T-AL5: 300 blocked requests on demo → WAF block spike within 4 min. oha cannot drop the
 # User-Agent header (-H 'User-Agent:' still sends oha's), so the spike uses an XSS query
 # argument (CrossSiteScripting_QUERYARGUMENTS) instead of NoUserAgent_HEADER.
+# an alert already firing for demo (earlier run) would not notify again: wait until it is Normal
+demo_state() { g "$GU/api/prometheus/grafana/api/v1/rules" | jq -r '[.data.groups[].rules[] | select(.name == "WAF block spike") | .alerts[]? | select(.labels.site_id == "demo") | .state] | first // "none"'; }
+for ((i=0; i<72; i++)); do [[ "$(demo_state)" =~ ^(Normal|none) ]] && break; sleep 5; done
 before=$(sinklog | wc -l)
 U="$WAF_URL/al5-spike?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E"
 "$OHA" -n 300 -c 10 --no-tui -H 'Host: demo.lab.test' "$U" >/dev/null 2>&1 \
@@ -42,9 +45,9 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: demo.lab.test' "$U")
 check "T-AL5 spike requests are blocked ($code)" test "$code" = 403
 fired=no
 for ((i=0; i<48; i++)); do
-  if sinklog | tail -n +$((before+1)) | grep -q '"title": "\[WAF\] WAF block spike"'; then fired=yes; break; fi
+  if sinklog | tail -n +$((before+1)) | grep '"title": "\[WAF\] WAF block spike"' | grep -q '"message": "firing: [0-9]* alert(s)\. site demo: '; then fired=yes; break; fi
   sleep 5
 done
-check "T-AL5 WAF block spike delivered (after $((i*5)) s)" test "$fired" = yes
-[[ "$fired" == yes ]] && sinklog | tail -n +$((before+1)) | grep -m1 'WAF block spike' | cut -c1-300
+check "T-AL5 WAF block spike firing for demo delivered (after $((i*5)) s)" test "$fired" = yes
+[[ "$fired" == yes ]] && sinklog | tail -n +$((before+1)) | grep 'WAF block spike' | grep -m1 'firing: [0-9]* alert(s). site demo' | cut -c1-300
 finish
