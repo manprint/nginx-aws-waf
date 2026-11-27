@@ -17,7 +17,7 @@ Odoo 14 dietro nginx, con il WAF davanti, e il monitoraggio completo: metriche (
 | Indirizzo | Cosa | Credenziali |
 |---|---|---|
 | http://odoo.localhost | Odoo 14 con dati demo (vendite, CRM, contatti) | `admin` / `admin` |
-| http://localhost:3000 | Grafana, cartella **WAF** (5 dashboard), accesso diretto | `admin` / `admin` (anche anonimo, sola lettura) |
+| http://localhost:3000 | Grafana, cartella **WAF** (8 dashboard), accesso diretto | `admin` / `admin` (anche anonimo, sola lettura) |
 | http://grafana.localhost | lo stesso Grafana, passando dal WAF | |
 | http://localhost | Odoo, perché è il sito di default del WAF | |
 | `localhost:8123` (HTTP), `localhost:9000` (nativo) | ClickHouse, log del WAF. Da browser: http://localhost:8123/play | `waf_ro` / `waf_ro` (lettura), `waf_admin` / `waf_admin` |
@@ -158,6 +158,7 @@ http://localhost:3000 (oppure http://grafana.localhost), cartella **WAF**:
 |---|---|---|
 | **WAF Richieste** (home) | ClickHouse | ogni richiesta: esito e, se bloccata, regola e causa in italiano. Dettaglio completo di una richiesta ([sotto](#la-dashboard-waf-richieste)) |
 | **WAF Traffic overview** | ClickHouse | come la *Traffic overview* della console AWS: frasi di sintesi, azioni con confronto sul periodo precedente, attacchi per tipo, mappa e classifiche (IP, paesi, ASN, URI, host, user-agent, referrer, metodi), label, login Odoo, rate limit, alert ([sotto](#la-dashboard-waf-traffic-overview)) |
+| **WAF IP** | ClickHouse | gestione degli IP client: sempre bloccati / in parte bloccati / mai bloccati, mappa per paese, provider (ASN), perché sono stati bloccati, dettaglio di un IP e come bloccarlo o metterlo in allowlist ([sotto](#la-dashboard-waf-ip)) |
 | **WAF Overview** | ClickHouse | richieste, bloccate, % per sito, top regole/IP/paesi/percorsi bloccati, latenze (paesi solo con [GeoIP](#geoip-paese-e-asn)) |
 | **WAF Rules & Tuning** | ClickHouse | regole configurate per sito (come la pagina *Rules* della Web ACL) con override, WCU usati, impostazioni; andamento di ogni regola nel tempo (bloccate / in count / senza effetto) e dove matcha; regole in count che bloccherebbero. Serve per decidere cosa passare in enforce |
 | **WAF Request Explorer** | ClickHouse | ricerca delle singole richieste per sito, IP, regola, esito, request id; dettaglio con header, body e regole matchate |
@@ -238,6 +239,28 @@ alert si vedono comunque in Grafana e nella dashboard.
      - {path_prefix: /web/percorso/che/sbaglia, rules: {NomeRegola: count}}
    ```
    Viene applicata entro 10 secondi.
+
+### La dashboard "WAF IP"
+
+Una riga per IP client nel periodo scelto, con lo **stato**: ⛔ *sempre bloccato* (tutte le
+richieste bloccate), ⚠ *in parte bloccato*, ✅ *mai bloccato*. Dall'alto:
+
+1. **Riepilogo**: IP distinti, per stato, paesi, IP senza paese (rete locale `LAN` o assente dal
+   database GeoIP `??`).
+2. **Mappa** per paese (🔴 IP bloccati, 🟢 IP mai bloccati, dimensione = numero di IP) e tabella
+   **Paesi** (clic sul paese per filtrare).
+3. **IP attivi nel tempo**, **IP per stato**, **Reti / provider (ASN)**.
+4. **Tabella degli IP**: stato, paese, ASN e organizzazione, richieste e bloccate, prima/ultima
+   vista, ultimo blocco e *perché è stato bloccato*. Clic su un IP: dettaglio qui sotto oppure le
+   sue richieste in *WAF Richieste*.
+5. **Dettaglio IP** (filtro *IP* compilato): chi è, richieste nel tempo, cause dei blocchi, ultime
+   200 richieste.
+6. Promemoria per **bloccare** un IP (`config/lists/custom-reputation.txt`), metterlo in
+   **allowlist** (regola custom `allow` con `ip_set`) o bloccare paesi (`geo_block`).
+
+Filtri: **Sito**, **Stato IP**, **Paese**, **IP** (intero, parziale come `46.4.` o CIDR come
+`2.38.0.0/16`). La localizzazione è per paese e serve [GeoIP](#geoip-paese-e-asn). La dashboard è
+generata da `grafana/waf-ip.py`: modifica quello e rilancia `python3 grafana/waf-ip.py`.
 
 ## Log in ClickHouse
 

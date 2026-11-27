@@ -1,0 +1,1920 @@
+{
+  "uid": "waf-ip",
+  "title": "WAF IP",
+  "tags": [
+    "waf"
+  ],
+  "schemaVersion": 39,
+  "editable": true,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "timezone": "browser",
+  "graphTooltip": 1,
+  "description": "Gestione degli IP client: bloccati, in parte bloccati, mai bloccati, con paese e provider (GeoIP).",
+  "links": [
+    {
+      "type": "dashboards",
+      "tags": [
+        "waf"
+      ],
+      "asDropdown": true,
+      "title": "Altre dashboard WAF"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "site",
+        "label": "Sito",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "ch"
+        },
+        "multi": true,
+        "includeAll": true,
+        "allValue": "'__all__'",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 2,
+        "sort": 1,
+        "query": "SELECT DISTINCT site_id FROM waf.agg_requests_1m WHERE minute > now() - INTERVAL 30 DAY ORDER BY site_id"
+      },
+      {
+        "name": "stato",
+        "label": "Stato IP",
+        "type": "custom",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "'__all__'",
+        "query": "Sempre bloccati : bloccato, In parte bloccati : misto, Mai bloccati : consentito",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "paese",
+        "label": "Paese",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "ch"
+        },
+        "multi": true,
+        "includeAll": true,
+        "allValue": "'__all__'",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 2,
+        "sort": 1,
+        "query": "SELECT DISTINCT multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') AS geo FROM waf.events WHERE $__timeFilter(ts) ORDER BY geo"
+      },
+      {
+        "name": "ip",
+        "label": "IP (anche parziale o CIDR)",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "IP distinti",
+      "description": "IP client visti nel periodo (con i filtri in alto).",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT count() FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote})))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "id": 1,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Sempre bloccati",
+      "description": "IP con tutte le richieste bloccate dal WAF.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT countIf(stato = 'bloccato') FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote})))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "id": 2,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "In parte bloccati",
+      "description": "IP con alcune richieste bloccate e altre consentite (utenti veri che hanno fatto scattare una regola, o scanner).",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT countIf(stato = 'misto') FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote})))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "id": 3,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Mai bloccati",
+      "description": "IP con nessuna richiesta bloccata.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT countIf(stato = 'consentito') FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote})))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "id": 4,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Paesi",
+      "description": "Paesi distinti di provenienza (servono i database GeoIP in data/geoip).",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT uniqIf(geo, geo NOT IN ('LAN', '??')) FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote})))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "purple"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "id": 5,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "IP senza paese",
+      "description": "IP di reti private/locali (LAN) o non presenti nel database GeoIP (??).",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT countIf(geo IN ('LAN', '??')) FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote})))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "id": 6,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "geomap",
+      "title": "Da dove arrivano gli IP — 🔴 IP bloccati, 🟢 IP mai bloccati (dimensione = numero di IP)",
+      "description": "Localizzazione per paese (GeoIP DB-IP/MaxMind). Gli IP di reti private (LAN) e quelli non presenti nel database GeoIP non compaiono sulla mappa: vedi la tabella. Clic su un cerchio per i numeri.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT geo AS Paese, count() AS IP, sum(req) AS Richieste, countIf(blk > 0) AS `IP bloccati`, countIf(blk = 0) AS `IP mai bloccati`, sum(blk) AS `Richieste bloccate` FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote}))) WHERE geo NOT IN ('LAN', '??') GROUP BY geo HAVING `IP mai bloccati` > 0",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT geo AS Paese, count() AS IP, sum(req) AS Richieste, countIf(blk > 0) AS `IP bloccati`, countIf(blk = 0) AS `IP mai bloccati`, sum(blk) AS `Richieste bloccate` FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote}))) WHERE geo NOT IN ('LAN', '??') GROUP BY geo HAVING `IP bloccati` > 0",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "view": {
+          "id": "zero",
+          "lat": 30,
+          "lon": 10,
+          "zoom": 1.3,
+          "allLayers": true
+        },
+        "controls": {
+          "showZoom": true,
+          "mouseWheelZoom": true,
+          "showAttribution": true
+        },
+        "basemap": {
+          "type": "default",
+          "name": "Base",
+          "config": {}
+        },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "IP mai bloccati",
+            "tooltip": true,
+            "filterData": {
+              "id": "byRefId",
+              "options": "A"
+            },
+            "location": {
+              "mode": "lookup",
+              "lookup": "Paese",
+              "gazetteer": "public/gazetteer/countries.json"
+            },
+            "config": {
+              "showLegend": false,
+              "style": {
+                "size": {
+                  "field": "IP mai bloccati",
+                  "fixed": 5,
+                  "min": 6,
+                  "max": 40
+                },
+                "color": {
+                  "fixed": "green"
+                },
+                "opacity": 0.55,
+                "symbol": {
+                  "mode": "fixed",
+                  "fixed": "img/icons/marker/circle.svg"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "Paese",
+                  "fixed": ""
+                },
+                "textConfig": {
+                  "fontSize": 10,
+                  "offsetY": -14
+                }
+              }
+            }
+          },
+          {
+            "type": "markers",
+            "name": "IP bloccati",
+            "tooltip": true,
+            "filterData": {
+              "id": "byRefId",
+              "options": "B"
+            },
+            "location": {
+              "mode": "lookup",
+              "lookup": "Paese",
+              "gazetteer": "public/gazetteer/countries.json"
+            },
+            "config": {
+              "showLegend": false,
+              "style": {
+                "size": {
+                  "field": "IP bloccati",
+                  "fixed": 5,
+                  "min": 6,
+                  "max": 40
+                },
+                "color": {
+                  "fixed": "red"
+                },
+                "opacity": 0.55,
+                "symbol": {
+                  "mode": "fixed",
+                  "fixed": "img/icons/marker/circle.svg"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "Paese",
+                  "fixed": ""
+                },
+                "textConfig": {
+                  "fontSize": 10,
+                  "offsetY": -14
+                }
+              }
+            }
+          }
+        ],
+        "tooltip": {
+          "mode": "details"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 14,
+        "h": 13
+      },
+      "id": 7,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Paesi",
+      "description": "Per paese: IP distinti, quanti bloccati almeno una volta, richieste e percentuale bloccata. Clic sul paese per filtrare la dashboard.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT if(match(geo, '^[A-Z]{2}$'), concat(char(240, 159, 135, 166 + ascii(substring(geo, 1, 1)) - 65), char(240, 159, 135, 166 + ascii(substring(geo, 2, 1)) - 65), ' ', geo), if(geo = 'LAN', '🏠 LAN', '❔ ??')) AS Paese, geo AS cc, count() AS IP, countIf(blk > 0) AS `IP bloccati`, countIf(blk = 0) AS `Mai bloccati`, sum(req) AS Richieste, sum(blk) AS Bloccate, round(100 * Bloccate / greatest(Richieste, 1), 1) AS `% bloccate` FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote}))) GROUP BY geo ORDER BY IP DESC, Richieste DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP bloccati"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mai bloccati"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% bloccate"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 10
+                    },
+                    {
+                      "color": "red",
+                      "value": 50
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cc"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Paese"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Filtra ${__data.fields.cc}",
+                    "url": "/d/waf-ip/waf-ip?${__url_time_range}&${site:queryparam}&var-paese=${__data.fields.cc}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 4,
+        "w": 10,
+        "h": 13
+      },
+      "id": 8,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "IP attivi nel tempo",
+      "description": "Per ogni intervallo: IP con almeno una richiesta bloccata e IP con sole richieste consentite.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 0,
+          "rawSql": "SELECT t AS time, countIf(b > 0) AS `IP bloccati`, countIf(b = 0) AS `IP solo consentiti` FROM (SELECT $__timeInterval(ts) AS t, client_ip, countIf(action = 'BLOCK') AS b FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) AND client_ip IN (SELECT ip FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote})))) GROUP BY t, client_ip) GROUP BY time ORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": {
+              "mode": "normal"
+            },
+            "lineWidth": 1
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP bloccati"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP solo consentiti"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "maxDataPoints": 60,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 10,
+        "h": 9
+      },
+      "id": 9,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "IP per stato",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT countIf(stato = 'bloccato') AS `Sempre bloccati`, countIf(stato = 'misto') AS `In parte bloccati`, countIf(stato = 'consentito') AS `Mai bloccati` FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote})))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sempre bloccati"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "In parte bloccati"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mai bloccati"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "pieType": "donut",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 17,
+        "w": 5,
+        "h": 9
+      },
+      "id": 10,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Reti / provider (ASN)",
+      "description": "Organizzazione proprietaria degli IP (database GeoIP ASN): utile per capire se il traffico bloccato arriva da hosting/cloud (bot) o da provider residenziali.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT if(asn_ = 0, '—', toString(asn_)) AS ASN, if(org = '', if(geo = 'LAN', 'rete locale', 'sconosciuto'), org) AS Organizzazione, count() AS IP, countIf(blk > 0) AS `IP bloccati`, sum(req) AS Richieste, sum(blk) AS Bloccate FROM (SELECT client_ip AS ip, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org, count() AS req, countIf(action = 'BLOCK') AS blk, multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS stato FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote}))) GROUP BY ASN, Organizzazione ORDER BY `IP bloccati` DESC, IP DESC LIMIT 100",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ASN"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 50
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP bloccati"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP bloccati"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 17,
+        "w": 9,
+        "h": 9
+      },
+      "id": 11,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "table",
+      "title": "IP (max 1000) — clic su un IP per il dettaglio qui sotto o per aprirne le richieste",
+      "description": "Una riga per IP client. Stato: ⛔ tutte le richieste bloccate, ⚠ alcune bloccate, ✅ nessuna bloccata. Paese e organizzazione da GeoIP. 'Perché è stato bloccato' = cause dei blocchi (fino a 5). Per bloccare un IP a mano o metterlo in allowlist vedi il riquadro in fondo.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') AS Stato, client_ip AS IP, if(match(geo, '^[A-Z]{2}$'), concat(char(240, 159, 135, 166 + ascii(substring(geo, 1, 1)) - 65), char(240, 159, 135, 166 + ascii(substring(geo, 2, 1)) - 65), ' ', geo), if(geo = 'LAN', '🏠 LAN', '❔ ??')) AS Paese, if(asn_ = 0, '', toString(asn_)) AS ASN, if(org = '', if(geo = 'LAN', 'rete locale', ''), org) AS Organizzazione, count() AS req, countIf(action = 'BLOCK') AS blk, req AS Richieste, blk AS Bloccate, round(100 * blk / req, 1) AS `% bloccate`, uniq(path) AS Percorsi, arrayStringConcat(arrayFilter(x -> x != '', groupUniqArray(site_id)), ', ') AS Siti, min(ts) AS `Prima vista`, max(ts) AS `Ultima vista`, if(blk = 0, NULL, maxIf(ts, action = 'BLOCK')) AS `Ultimo blocco`, arrayStringConcat(groupUniqArrayIf(5)(waf_causa(replaceRegexpOne(terminating_rule, '^.*/', ''), terminating_type), action = 'BLOCK'), ' · ') AS `Perché è stato bloccato`, any(user_agent) AS `User-Agent`, anyLast(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')) AS geo, anyLast(asn) AS asn_, anyLast(as_org) AS org FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ('__all__' IN (${paese:singlequote}) OR multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') IN (${paese:singlequote})) GROUP BY client_ip HAVING ('__all__' IN (${stato:singlequote}) OR multiIf(blk = 0, 'consentito', blk = req, 'bloccato', 'misto') IN (${stato:singlequote})) ORDER BY blk DESC, req DESC LIMIT 1000",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stato"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "bloccato": {
+                        "text": "⛔ sempre bloccato",
+                        "color": "red",
+                        "index": 0
+                      },
+                      "misto": {
+                        "text": "⚠ in parte bloccato",
+                        "color": "orange",
+                        "index": 1
+                      },
+                      "consentito": {
+                        "text": "✅ mai bloccato",
+                        "color": "green",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 125
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Dettaglio di ${__value.raw} (in questa dashboard)",
+                    "url": "/d/waf-ip/waf-ip?${__url_time_range}&${site:queryparam}&var-ip=${__value.raw}"
+                  },
+                  {
+                    "title": "Richieste di ${__value.raw} in WAF Richieste",
+                    "url": "/d/waf-requests/waf-richieste?${__url_time_range}&${site:queryparam}&var-ip=${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Paese"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ASN"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Organizzazione"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 190
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Richieste"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bloccate"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Percorsi"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Siti"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bloccate"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% bloccate"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 10
+                    },
+                    {
+                      "color": "red",
+                      "value": 50
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prima vista"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ultima vista"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ultimo blocco"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Perché è stato bloccato"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 330
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "req"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blk"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "geo"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "asn_"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "org"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Bloccate",
+            "desc": true
+          }
+        ]
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 16
+      },
+      "id": 12,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "row",
+      "title": "Dettaglio IP: ${ip} (scrivi un IP, una parte o un CIDR nel filtro IP in alto)",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 42,
+        "w": 24,
+        "h": 1
+      },
+      "id": 13,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Chi è",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT client_ip AS IP, if(match(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??'), '^[A-Z]{2}$'), concat(char(240, 159, 135, 166 + ascii(substring(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??'), 1, 1)) - 65), char(240, 159, 135, 166 + ascii(substring(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??'), 2, 1)) - 65), ' ', multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??')), if(multiIf(country != '', country, (isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'LAN', '??') = 'LAN', '🏠 LAN', '❔ ??')) AS Paese, anyLast(asn) AS ASN, anyLast(as_org) AS Organizzazione, if((isIPAddressInRange(client_ip, '10.0.0.0/8') OR isIPAddressInRange(client_ip, '172.16.0.0/12') OR isIPAddressInRange(client_ip, '192.168.0.0/16') OR isIPAddressInRange(client_ip, '127.0.0.0/8') OR isIPAddressInRange(client_ip, '100.64.0.0/10') OR isIPAddressInRange(client_ip, '169.254.0.0/16') OR isIPAddressInRange(client_ip, 'fc00::/7') OR isIPAddressInRange(client_ip, 'fe80::/10') OR client_ip = '::1'), 'privata / locale', 'pubblica') AS Rete, count() AS Richieste, countIf(action = 'BLOCK') AS Bloccate, uniq(user_agent) AS `User-Agent distinti`, min(ts) AS `Prima vista`, max(ts) AS `Ultima vista` FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ${ip:sqlstring} != '' GROUP BY client_ip, Paese, Rete ORDER BY Richieste DESC LIMIT 50",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Dettaglio di ${__value.raw} (in questa dashboard)",
+                    "url": "/d/waf-ip/waf-ip?${__url_time_range}&${site:queryparam}&var-ip=${__value.raw}"
+                  },
+                  {
+                    "title": "Richieste di ${__value.raw} in WAF Richieste",
+                    "url": "/d/waf-requests/waf-richieste?${__url_time_range}&${site:queryparam}&var-ip=${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prima vista"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ultima vista"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bloccate"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 24,
+        "h": 5
+      },
+      "id": 14,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Richieste dell'IP nel tempo",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(ts) AS time, countIf(action != 'BLOCK') AS consentite, countIf(action = 'BLOCK') AS bloccate FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ${ip:sqlstring} != '' GROUP BY time ORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": {
+              "mode": "normal"
+            },
+            "lineWidth": 1
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "consentite"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "bloccate"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "maxDataPoints": 60,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "id": 15,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Perché è stato bloccato",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT waf_causa(replaceRegexpOne(terminating_rule, '^.*/', ''), terminating_type) AS Causa, if(terminating_type = 'RATE_BASED', 'RateLimit', replaceRegexpOne(terminating_rule, '^[^/]*/', '')) AS Regola, count() AS Richieste, max(ts) AS Ultima FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ${ip:sqlstring} != '' AND action = 'BLOCK' GROUP BY Causa, Regola ORDER BY Richieste DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ultima"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Causa"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "id": 16,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Ultime richieste dell'IP (clic su request_id per il dettaglio completo)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT ts AS Ora, client_ip AS IP, site_id AS Sito, method AS Metodo, concat(path, if(query = '', '', concat('?', query))) AS URL, status AS Stato, action AS Esito, if(action = 'BLOCK', waf_causa(replaceRegexpOne(terminating_rule, '^.*/', ''), terminating_type), '') AS Causa, user_agent AS `User-Agent`, request_id FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR position(client_ip, ${ip:sqlstring}) > 0 OR (match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$') AND isIPAddressInRange(client_ip, if(match(${ip:sqlstring}, '^[0-9a-fA-F:.]+/[0-9]{1,3}$'), ${ip:sqlstring}, '255.255.255.255/32')))) AND ${ip:sqlstring} != '' ORDER BY ts DESC LIMIT 200",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ora"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 115
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sito"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Metodo"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stato"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 55
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URL"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 320
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Esito"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "BLOCK": {
+                        "text": "⛔ BLOCCATA",
+                        "color": "red",
+                        "index": 0
+                      },
+                      "ALLOW": {
+                        "text": "✅ consentita",
+                        "color": "green",
+                        "index": 1
+                      },
+                      "FAIL": {
+                        "text": "⚠ errore WAF",
+                        "color": "orange",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Causa"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "request_id"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Dettaglio richiesta",
+                    "url": "/d/waf-requests/waf-richieste?${__url_time_range}&var-rid=${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 24,
+        "h": 10
+      },
+      "id": 17,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      }
+    },
+    {
+      "type": "text",
+      "title": "Come bloccare o sbloccare un IP",
+      "datasource": null,
+      "options": {
+        "mode": "markdown",
+        "content": "\n**Bloccare** uno o più IP: scrivili (IP o CIDR, uno per riga) in `config/lists/custom-reputation.txt`\n(crea la cartella se manca). Il WAF li carica entro 30 s e li blocca come la *AWSManagedIPReputationList*\n(causa: *IP con cattiva reputazione*). Per sbloccarli togli la riga; per disattivare la lista svuota il file, non cancellarlo.\n\n**Non bloccare mai** un IP (ufficio, monitoraggio, VPN aziendale): regola custom `allow` nel file del sito, es. `config/sites/odoo.yaml`:\n\n```yaml\ncustom_rules:\n  - name: AllowOffice\n    slot: start\n    action: allow\n    match: {all: [{ip_set: [203.0.113.10/32, 192.168.10.0/24]}]}\n```\n\n**Bloccare interi paesi**: `geo_block: {countries: [CN, RU], action: block}` nel file del sito (serve `WAF_GEOIP=true` e i database in `data/geoip`).\n\nLe modifiche a `config/sites/` sono applicate entro 10 s, senza riavvio. Controllo: `docker compose logs -f waf`.\n"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 66,
+        "w": 24,
+        "h": 11
+      },
+      "id": 18
+    }
+  ]
+}
