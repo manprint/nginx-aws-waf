@@ -41,15 +41,26 @@ fi
 # argument (CrossSiteScripting_QUERYARGUMENTS) instead of NoUserAgent_HEADER.
 # an alert already firing for demo (earlier run) would not notify again: wait until it is Normal
 demo_state() { g "$GU/api/prometheus/grafana/api/v1/rules" | jq -r '[.data.groups[].rules[] | select(.name == "WAF block spike") | .alerts[]? | select(.labels.site_id == "demo") | .state] | first // "none"'; }
-for ((i=0; i<72; i++)); do [[ "$(demo_state)" =~ ^(Normal|none) ]] && break; sleep 5; done
+# ... and until the last demo notification is "resolved": Alertmanager dedups a group whose alert
+# resolved and fired again within group_interval (no "resolved" sent in between) until
+# repeat_interval (4h), so a spike right after an earlier one (corpus, back-to-back runs) is silent
+last_demo() { sinklog | grep '"title": "\[WAF\] WAF block spike"' | grep 'site demo:' | tail -1; }
+for ((i=0; i<144; i++)); do
+  l=$(last_demo)
+  [[ "$(demo_state)" =~ ^(Normal|none) ]] && { [[ -z "$l" ]] || grep -q '"message": "resolved' <<<"$l"; } && break
+  sleep 5
+done
+echo "T-AL5 waited $((i*5)) s for demo Normal + resolved notification"
 before=$(sinklog | wc -l)
 U="$WAF_URL/al5-spike?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E"
 "$OHA" -n 300 -c 10 --no-tui -H 'Host: demo.lab.test' "$U" >/dev/null 2>&1 \
   || for i in $(seq 300); do curl -s -o /dev/null -H 'Host: demo.lab.test' "$U"; done
 code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: demo.lab.test' "$U")
 check "T-AL5 spike requests are blocked ($code)" test "$code" = 403
+# up to 7 min: pending (for 2m) + evaluation (1m) + group_wait (30s) ≈ 210 s; but when the demo
+# group sent a "resolved" just before (back-to-back runs), group_interval (5m) delays the new firing
 fired=no
-for ((i=0; i<48; i++)); do
+for ((i=0; i<84; i++)); do
   if sinklog | tail -n +$((before+1)) | grep '"title": "\[WAF\] WAF block spike"' | grep -q '"message": "firing: [0-9]* alert(s)\. site demo: '; then fired=yes; break; fi
   sleep 5
 done

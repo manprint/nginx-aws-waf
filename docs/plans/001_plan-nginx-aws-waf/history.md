@@ -428,3 +428,16 @@
   - ALL PASS: smoke, apply, joinlog, central, cli ×3, metrics, grafana, ratelimit, pki, multinode ×3.
   - The first multinode run FAILED 4: waf2-vector was still running the old config while the file changed. Then 3 consecutive ALL PASS.
   - make test-unit: 0 FAIL.
+
+## P6 closure — PHASE 6 DONE (27-11-2026 UTC, agent-1:opus)
+- **Phase fix (T-AL5 flakiness).** A back-to-back final-check failed at step 7. Grafana's log showed the block-spike alerts reaching the notifier, but no notification went out.
+  - Cause: the previous spike's demo group had resolved and fired again within group_interval, with no "resolved" notification sent in between. Alertmanager dedups that until repeat_interval (4h). The first hypothesis (group_interval delaying the next notification) was wrong; the fire window extension to 7 min stays as harmless margin.
+  - Fix in tests/e2e/alerts.sh: before the spike, wait until demo is Normal AND the last demo notification in alert-sink is "resolved" (max 12 min).
+  - docs/dashboards-alerts.md explains this operational case.
+- **Self-review against the phase scope:**
+  - Export fidelity: every row of the condition→statement table and every managed/rate/custom shape is covered by TestEXP1–6/TF1–3 or the fixtures. Overrides are emitted only when they differ from the catalog default; empty RuleActionOverrides and ScopeDown are omitted.
+  - AWS validation: AWS CLI says VALID for all 12 lab sites plus 3 golden web ACLs and an IP set. Terraform validate + fmt says VALID for shop18, tuned, allowlist and 4 fixtures.
+  - Lossy reporting: Compat reasons plus shadow+default-block. Without --allow-lossy the export exits 2 with the list; with it, the reasons appear in `lossy` and as HCL comments.
+  - List safety: validate-all-before-install, the 50 % guard, tmp+rename, custom-reputation never overwritten, offline → kept rc 0.
+  - Docs: aws-export.md, operations.md, multi-node.md, README, CHANGELOG, tests/README.
+- **G-P6:** `make test-unit` 16 ok, then `make final-check` 8 × G-FINAL step N OK (events in 6.0 s, alert after 180 s, shop18.tf VALID with lossy=xff).

@@ -146,6 +146,10 @@ Le regole sono generate da `central.yaml` in
   `ingest_lag_min`.
 - Le notifiche sono raggruppate per `alertname` e `site_id`: 30 s di attesa iniziale, poi un
   aggiornamento ogni 5 min se cambia qualcosa, e un promemoria ogni 4 h se l'alert resta attivo.
+  Può capitare che un alert rientri e scatti di nuovo entro 5 minuti, prima che venga inviata la
+  notifica di rientro. In quel caso non arriva una nuova notifica: per Alertmanager è lo stesso
+  alert ancora attivo, già notificato, e ti verrà ricordato solo dopo 4 h. Per sapere se un picco
+  è ancora in corso guarda lo stato in Grafana (Alerting → Alert rules), non solo le notifiche.
 - Il messaggio ha titolo `[WAF] <regola>` e corpo `firing: N alert(s). site demo: 306 blocked
   requests in 5 min (threshold 20)`. Il tipo è `warning` quando l'alert scatta e `success` quando
   rientra.

@@ -9,10 +9,10 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Settings: autonomy true (plan) · WIP on (plan) · deadline none
 - Stop latch: none
 - Scope: plan 001 · RUNNING · overrides none
-- Unit: phase P6/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
+- Unit: plan PLAN/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
 - Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
-- Last closure: unit:6.5:1
-- Next: close P6 (G-P6) · next eligible: P6
+- Last closure: unit:P6:1
+- Next: close PLAN (G-FINAL) · next eligible: PLAN
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -114,6 +114,9 @@ none
 - Grafana custom `allValue` is inserted verbatim (no :format): quote it in the value (4.2).
 - A changed nginx `listen` address cannot be reloaded (EADDRINUSE): restart the waf container (4.1).
 - Do not rename the node Vector file source id: a new id has no checkpoint and re-reads the current logs (duplicate events, P3 review).
+- libmodsecurity 3 `@ipMatch` rejects an IPv6 `/128` (nginx -t "Rules error"): render full-length prefixes as bare addresses (6.3, `render/conds.go ipMatchList`).
+- Do not drop the node Vector file source `max_read_bytes: 1048576`: the 2048 B default delays bursts with audit bodies by about 7 s (G-FINAL step 3, 6.5).
+- Grafana/Alertmanager dedups a group that resolved and re-fired within group_interval (no "resolved" sent in between) until repeat_interval 4h. T-AL5 waits for the demo "resolved" notification before the spike (6.5/P6).
 - Vector 0.62 (3.1): `${VAR}` in config needs VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true; the `vector` sink needs an `http://` address (no scheme = TLS); `geoip` table rejects Country DBs → `type: mmdb`; idle file sources back off up to ~8 s each → node reads access+audit with ONE file source and the join uses `max_events: 2`.
 
 ## 11. Board
@@ -125,8 +128,8 @@ none
 | 3 | DONE | 1 | 3.1–3.6 | unit:P3:1 |
 | 4 | DONE | 1 | 4.1–4.4 | unit:P4:1 |
 | 5 | DONE | 1 | 5.1–5.5 | unit:P5:1 |
-| 6 | IN_PROGRESS | 1 | 6.1–6.5 | — |
-| PLAN | TODO | 1 | — | — |
+| 6 | DONE | 1 | 6.1–6.5 | unit:P6:1 |
+| PLAN | IN_PROGRESS | 1 | — | — |
 
 Phase 1: DONE (unit:P1:1), 1.1–1.9 DONE attempt 1.
 
@@ -138,6 +141,8 @@ Phase 4: DONE (unit:P4:1), 4.1–4.4 DONE attempt 1.
 
 Phase 5: DONE (unit:P5:1), 5.1–5.5 DONE attempt 1.
 
+Phase 6: DONE (unit:P6:1), 6.1–6.5 DONE attempt 1.
+
 Phase 6 (expanded):
 | ID | Depends | Status | Attempt | Assigned | Ref / note |
 |----|---------|--------|---------|----------|------------|
@@ -146,7 +151,7 @@ Phase 6 (expanded):
 | 6.3 | 6.2 | DONE | 1 | agent-1 | unit:6.3:1 |
 | 6.4 | 6.3 | DONE | 1 | agent-1 | unit:6.4:1 |
 | 6.5 | 6.4 | DONE | 1 | agent-1 | unit:6.5:1 |
-| P6 | 6.1–6.5 | IN_PROGRESS | 1 | agent-1 | |
+| P6 | 6.1–6.5 | DONE | 1 | agent-1 | unit:P6:1 |
 
 README obligation: 1.9 (README rewrite), then 2.5, 3.6, 4.4, 5.5 and 6.5 add sections.
 Open corrections: none. Open audits: none.
