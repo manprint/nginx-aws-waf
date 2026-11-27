@@ -1,18 +1,18 @@
 # nginx AWS WAF — State
 
 Format: pev-state 2
-Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn branch `main` (no commits; unit 0.1 makes the first commit) · updated 27-11-2026 04:50 UTC by agent-1:opus
+Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn branch `main` (no commits; unit 0.1 makes the first commit) · updated 27-11-2026 05:00 UTC by agent-1:opus
 §0 Protocol: without this skill read PROTOCOL.md once. History: history.md (append-only, never read to resume).
 
 ## 1. Now
-- Run: verify 001 (V001, correction pass V6) · result RUNNING · settings autonomy true (§3), WIP on (§3) · acting as agent-1:opus
+- Run: verify 001 (V001, correction pass V6) · result COMPLETE · settings autonomy true (§3), WIP on (§3) · acting as agent-1:opus
 - Settings: autonomy true (plan) · WIP on (plan) · deadline none
 - Stop latch: none
 - Scope: plan 001 · COMPLETE · overrides none
 - Unit: none
-- Base: HEAD 49bacd7 + clean tree · branch main · last WIP tree none
-- Last closure: unit:P5:2
-- Next: PLAN/2 (G-FINAL)
+- Base: HEAD 97c6a79 + clean tree · branch main · last WIP tree none
+- Last closure: unit:PLAN:2
+- Next: none (plan 001 COMPLETE; V001 corrections applied)
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -115,16 +115,12 @@ none
 | 4 | DONE | 1 | 4.1–4.4 | unit:P4:1 |
 | 5 | DONE | 2 | 5.1–5.5, V001-C1 | unit:P5:2 |
 | 6 | DONE | 1 | 6.1–6.5 | unit:P6:1 |
-| PLAN | TODO | 2 | — | unit:PLAN:1 |
+| PLAN | DONE | 2 | — | unit:PLAN:2 |
 
 README obligation: fulfilled (1.9, 2.5, 3.6, 4.4, 5.5, 6.5).
 Open audits: none.
 
-Corrections (V001):
-| Correction | Status | Attempt | Findings | Reopens | Closure ref |
-|------------|--------|---------|----------|---------|-------------|
-| V001-C1 | DONE | 1 | F1 | 5 | unit:V001-C1:1 |
-| V001-C2 | DONE | 1 | F2 | — | unit:V001-C2:1 |
+Corrections: V001-C1 DONE (unit:V001-C1:1), V001-C2 DONE (unit:V001-C2:1); none open.
 Statuses: TODO, IN_PROGRESS, IN_REVIEW, DONE, SKIPPED (reason kept), BLOCKED.
 
 ## 12. Suspended implementation

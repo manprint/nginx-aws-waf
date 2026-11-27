@@ -517,3 +517,15 @@ Notes:
 
 ## 27-11-2026 P5/2 complete (commit below)
 Gates: G-P5 (amended): make test-unit ok; lab-up ok; pki-isolation.sh ALL PASS; multinode.sh ALL PASS; bootstrap.sh ALL PASS; tf-validate Success; G-SEC empty (tree + history). Review: agent-1:opus — V001-C1 meets its local contract (guard + isolation + doc), no regressions in phase 5. Changes: plan records only.
+
+## 27-11-2026 PLAN/2 complete (commit below)
+- **Gates:**
+  - G-FINAL on 97c6a79: final-check passes all 8 steps (8 × OK). Bench: GET 4983 rps with p99 3.63 ms; POST 4456 rps with p99 3.33 ms; D29 met.
+  - G-SEC empty.
+- **Checks:**
+  - Phases P0–P6 are DONE; P5 is now at attempt 2.
+  - V001 findings: F1 and F2 both FIXED.
+  - No corrections, blockers or open audits.
+  - README obligation fulfilled.
+- **Review:** agent-1:opus final review confirms the plan goal is unchanged; V001-C1 adds a guard and makes no behaviour change for a correct PKI.
+- **Changes:** plan records only.
