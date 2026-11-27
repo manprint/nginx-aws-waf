@@ -7,6 +7,7 @@
 | `$WAF_HOME` | questo repo (prodotto: catalogo, profili, compose, script) |
 | `$WAF_CONFIG_DIR` | config del nodo (repo git per nodo): `node.yaml`, `sites/`, `profiles/`, `pages/`, `state/` |
 | `$WAF_DATA_DIR` | dati: `runtime/<rev>`, `runtime/current`, `lists/`, `logs/`, `raw/<giorno>/`, `certs/<sito>/`, `geoip/`, `vector/`, `state/audit-slot` |
+| `$WAF_CENTRAL_DIR` | dati del centrale (default `$WAF_DATA_DIR/central`): `clickhouse/`, `vector/` |
 
 Nel lab `source scripts/lab-env.sh` imposta `WAF_HOME`, `WAF_CONFIG_DIR=lab/config`,
 `WAF_DATA_DIR=.run` e il `PATH` per `wafctl`. In produzione le variabili stanno in
@@ -66,6 +67,40 @@ un reload da solo continuerebbe a scrivere nel file rinominato. Quando ruota `au
 alterna lo "slot" (`state/audit-slot`: `SecAuditLog /var/log/waf/audit.log` ↔
 `/var/log/waf//audit.log`, stesso file con un nome diverso) e fa un apply: il reload apre un
 `audit.log` nuovo senza perdere righe e senza riavviare nginx.
+
+## Stack centrale e segreti
+
+Il ruolo in `node.yaml` sceglie i file compose usati da `wafctl apply`:
+
+| `role` | File |
+|---|---|
+| `node` | `node.yml` + `node.<network>.yml` |
+| `central` | `central.yml` |
+| `all-in-one` | entrambi; in bridge anche `central.bridge.yml` |
+
+Le password di ClickHouse si generano una sola volta sul centrale:
+
+```bash
+wafctl secrets init          # crea $WAF_CONFIG_DIR/secrets.env (0600); --force le rigenera
+```
+
+Il file contiene `WAF_CH_ADMIN_PASSWORD`, `WAF_CH_INGEST_PASSWORD` e `WAF_CH_RO_PASSWORD`. `wafctl`
+lo passa al compose con `--env-file`. È escluso da git e non va mai committato.
+
+Le password vengono applicate solo al **primo** avvio di ClickHouse (`initdb`). Se le rigeneri
+dopo, devi aggiornare anche gli utenti in ClickHouse, oppure ripartire da `clickhouse/` vuota.
+
+Quando cambia `vector/forward.yaml` (indirizzo del centrale), `wafctl apply` riavvia `vector`.
+
+Sul centrale, dopo ogni aggiornamento di `wafctl`:
+
+```bash
+wafctl ch migrate                       # migrazioni dello schema (idempotente)
+wafctl ch retention                     # TTL attuali; --raw-days N / --agg-days M per cambiarli
+```
+
+Il disco del centrale cresce con la retention degli eventi grezzi (default 30 giorni). Le tabelle
+aggregate (400 giorni) sono piccole. Dettagli in [observability.md](observability.md).
 
 ## Liste IP
 

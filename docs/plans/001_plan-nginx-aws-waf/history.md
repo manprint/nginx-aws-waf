@@ -167,3 +167,7 @@
 - Migrations: `waf.schema_migrations` is ReplacingMergeTree(version) (plan gave only the columns); 001 adopted when waf.events exists. HTTP runs one statement per request → Statements() splits on `;\n` (8 statements in 001).
 - Retention: `ALTER … MODIFY TTL … + INTERVAL {days:UInt32} DAY DELETE` (parameterised; CH stores `_CAST(n,'UInt32')`, display normalised to `N DAY`). Admin user via WAF_CH_ADMIN_PASSWORD (env or secrets.env).
 - G-U35: TestH1_, TestH2_, TestM1_ PASS; cli.sh ALL PASS 20/20 (report 24.8 KB, no external refs, NoUserAgent_HEADER; migrate idempotent; retention 20 → shown, restored 30; agg < raw rejected).
+
+## 3.6 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW docs/observability.md (IT): flusso dati, stack centrale + utenti, tabelle + significato campi, comandi logs/stats/report, `--raw`, export + mappatura AWS, retention, migrazioni, GeoIP. WRITE README.md (sezione "Osservabilità", mappa directory, link), docs/operations.md (`$WAF_CENTRAL_DIR`, ruoli/compose, `secrets init`, migrate/retention).
+- G-U36 self-review evidence: every command in observability.md and the README section executed on the lab (logs search ×4 incl. --matched/--from/--ip, show, tail (timeout 5), stats ×5, report ×2, --raw ×2, export jsonl/csv/aws|jq, ch retention ×3, ch migrate, make geoip-test): all rc=0 (tail 124 by timeout). Claim "vector-central non parte senza i file GeoIP" verified (Vector: `Enrichment Table "geo_country": i/o error: No such file or directory`).

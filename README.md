@@ -43,16 +43,36 @@ make lab-down
 
 Profili e motivazioni: [docs/odoo.md](docs/odoo.md).
 
+## Osservabilità
+
+`make lab-min-up` avvia anche lo storage centrale: ClickHouse su `127.0.0.1:8123` e
+`vector-central`. Gli eventi di ogni richiesta arrivano lì in pochi secondi, arricchiti con
+paese e ASN.
+
+```sh
+wafctl logs search --since 15m --action BLOCK          # ultime richieste bloccate
+wafctl logs show <request_id>                          # evento completo + regole matchate
+wafctl logs tail --site demo                           # in diretta
+wafctl stats --since 24h --by rule --counted           # regole in COUNT che bloccherebbero
+wafctl logs export --since 1h --format aws -o out.jsonl   # formato log AWS WAF
+wafctl report --html --since 24h -o build/report.html  # report autocontenuto
+wafctl stats --since 1h --raw .run/raw                 # offline, senza ClickHouse
+```
+
+Dettagli (flusso, tabelle, campi, mappatura AWS, retention, GeoIP):
+[docs/observability.md](docs/observability.md).
+
 ## Mappa delle directory
 
 | Percorso | Contenuto |
 |---|---|
 | `waf/` | catalogo regole, file dati, pagine 403/500, Dockerfile del motore |
-| `wafctl/` | CLI Go (`validate`, `render`, `apply`, `diff`, `explain`, `bypass`, `test`, `logs`, `catalog`) |
+| `wafctl/` | CLI Go (`validate`, `render`, `apply`, `diff`, `explain`, `bypass`, `test`, `logs`, `stats`, `report`, `ch`, `secrets`, `catalog`) |
 | `profiles/` | profili di prodotto (`aws-default`, `shadow`, `strict`, `odoo-*`) |
 | `lab/config/` | configurazione del nodo di lab (`node.yaml`, `sites/`) |
-| `deploy/compose/` | compose del nodo (`node.yml` + `node.host.yml` / `node.bridge.yml`, lab) |
-| `deploy/vector/` | pipeline Vector del nodo (eventi uniti in JSONL) |
+| `deploy/compose/` | compose del nodo (`node.yml` + `node.host.yml` / `node.bridge.yml`), del centrale (`central.yml`, `central.bridge.yml`), lab |
+| `deploy/clickhouse/` | schema iniziale, utenti, config di ClickHouse |
+| `deploy/vector/` | pipeline Vector del nodo (eventi uniti in JSONL, inoltro) e del centrale (GeoIP → ClickHouse) |
 | `deploy/systemd/` | timer per bypass e rotazione log |
 | `tests/` | corpus di richieste, e2e, flussi legittimi Playwright (`tests/legit/`) |
 | `scripts/` | fetch, `lab-env.sh`, `ngx-test.sh`, `bench.sh`, `lab-attack.sh`, `lab-matrix.sh` (+ `sql/`) |
@@ -64,7 +84,8 @@ Profili e motivazioni: [docs/odoo.md](docs/odoo.md).
 - [docs/rules-spec.md](docs/rules-spec.md) — regole AWS e come sono riprodotte, schema ID
 - [docs/config-reference.md](docs/config-reference.md) — tutte le chiavi di configurazione
 - [docs/tuning.md](docs/tuning.md) — flusso shadow → count + label rule → enforce, bypass
-- [docs/operations.md](docs/operations.md) — percorsi, apply/rollback, systemd, log
+- [docs/operations.md](docs/operations.md) — percorsi, apply/rollback, systemd, log, centrale, segreti
+- [docs/observability.md](docs/observability.md) — eventi, ClickHouse, `wafctl logs/stats/report`, export AWS
 - [docs/performance.md](docs/performance.md) — benchmark
 - [docs/odoo.md](docs/odoo.md) — profili Odoo, eccezioni, lab, tuning di un modulo
 - [docs/lab-matrix-001.md](docs/lab-matrix-001.md) — matrice di lab finale del piano 001
