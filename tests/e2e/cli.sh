@@ -49,4 +49,18 @@ oa=$("$W" stats --since 2h --format json | jq '.[0].requests')
 check "S-overview-agg ($oa >= $a)" test "$oa" -ge "$a"
 cn=$("$W" stats --since 2h --by rule --counted --format json | jq '[.[] | select(.counted != .matches)] | length')
 check "S-counted-only" test "$cn" = 0
+
+# --- 3.5 report + retention + migrate (G-U35)
+r="$ROOT/build/r.html"; rm -f "$r"
+"$W" report --html --since 1h -o "$r" 2>/dev/null
+sz=$(stat -c %s "$r" 2>/dev/null || echo 0)
+check "H-report-size ($sz > 10240)" test "$sz" -gt 10240
+check "H-report-no-external-refs" bash -c "! grep -Eiq '(src|href)=\"?(https?:)?//' '$r'"
+check "H-report-NoUserAgent" grep -q NoUserAgent_HEADER "$r"
+check "M-migrate-idempotent" bash -c "'$W' ch migrate | grep -q 'up to date'"
+"$W" ch retention --raw-days 20 >/dev/null
+check "M-retention-20" bash -c "'$W' ch retention | grep -Eq '^events +20 DAY'"
+"$W" ch retention --raw-days 30 >/dev/null
+check "M-retention-restored" bash -c "'$W' ch retention | grep -Eq '^matches +30 DAY'"
+check "M-retention-agg-ge-raw" bash -c "! '$W' ch retention --agg-days 10 2>/dev/null"
 finish

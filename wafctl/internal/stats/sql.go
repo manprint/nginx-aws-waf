@@ -65,5 +65,5 @@ const Timeline = "SELECT toString(toStartOfHour(minute)) AS hour, sumIf(a.reques
 	"sumIf(a.requests, action = 'FAIL') AS fail FROM waf.agg_requests_1m AS a WHERE " + aggWindow + " AND " + siteCond + " GROUP BY hour ORDER BY hour"
 
 // Fails lists FAIL events (report section 8).
-const Fails = "SELECT toString(ts) AS ts, site_id AS site, fail_reason, method, path, status, request_id FROM waf.events WHERE " +
+const Fails = "SELECT ts, site_id AS site, fail_reason, method, path, status, request_id FROM waf.events WHERE " +
 	evWindow + " AND " + siteCond + " AND action = 'FAIL' ORDER BY ts DESC LIMIT {top:UInt32}"

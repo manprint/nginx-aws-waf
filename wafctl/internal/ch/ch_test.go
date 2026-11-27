@@ -95,3 +95,40 @@ func TestQR1_RawPassesParams(t *testing.T) {
 		t.Errorf("args %v stdin tail %q", args, stdin[len(stdin)-40:])
 	}
 }
+
+func TestM1_MigrationsOrderedAnd001Adopted(t *testing.T) {
+	ms, err := ListMigrations()
+	if err != nil || len(ms) == 0 || ms[0].Version != 1 {
+		t.Fatalf("migrations %v %v", ms, err)
+	}
+	for i := 1; i < len(ms); i++ {
+		if ms[i].Version <= ms[i-1].Version {
+			t.Errorf("not ordered: %s after %s", ms[i].Name, ms[i-1].Name)
+		}
+	}
+	extra := append(ms, Migration{Version: 2, Name: "002-x.sql"})
+	p, adopt := Pending(extra, map[uint32]bool{}, true)
+	if !adopt || len(p) != 1 || p[0].Version != 2 {
+		t.Errorf("existing schema: pending %v adopt %v", p, adopt)
+	}
+	p, adopt = Pending(extra, map[uint32]bool{}, false)
+	if adopt || len(p) != 2 || p[0].Version != 1 {
+		t.Errorf("empty db: pending %v adopt %v", p, adopt)
+	}
+	p, adopt = Pending(extra, map[uint32]bool{1: true, 2: true}, true)
+	if adopt || len(p) != 0 {
+		t.Errorf("all applied: %v %v", p, adopt)
+	}
+	st := Statements(ms[0].SQL)
+	if len(st) != 8 || !strings.HasPrefix(st[0], "CREATE DATABASE") {
+		t.Errorf("statements: %d first %q", len(st), st[0])
+	}
+	for _, s := range st {
+		if strings.HasSuffix(s, ";") {
+			t.Errorf("statement keeps ';': %.60s", s)
+		}
+	}
+	if ValidateRetention(20, 0, 30, 400) != nil || ValidateRetention(0, 10, 30, 400) == nil || ValidateRetention(4000, 0, 30, 4000) == nil {
+		t.Error("retention validation")
+	}
+}

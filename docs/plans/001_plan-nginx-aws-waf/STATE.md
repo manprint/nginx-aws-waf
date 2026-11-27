@@ -9,10 +9,10 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Settings: autonomy true (plan) · WIP on (plan) · deadline none
 - Stop latch: none
 - Scope: plan 001 · RUNNING · overrides none
-- Unit: sub-phase 3.5/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
+- Unit: sub-phase 3.6/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
 - Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
-- Last closure: unit:3.4:1
-- Next: open 3.5 · next eligible: 3.5
+- Last closure: unit:3.5:1
+- Next: open 3.6 · next eligible: 3.6
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -135,8 +135,8 @@ Phase 3 (expanded):
 | 3.2 | 3.1 | DONE | 1 | agent-1 | unit:3.2:1 |
 | 3.3 | 3.2 | DONE | 1 | agent-1 | unit:3.3:1 |
 | 3.4 | 3.3 | DONE | 1 | agent-1 | unit:3.4:1 |
-| 3.5 | 3.4 | TODO | 1 | agent-1 | |
-| 3.6 | 3.5 | TODO | 1 | agent-1 | |
+| 3.5 | 3.4 | DONE | 1 | agent-1 | unit:3.5:1 |
+| 3.6 | 3.5 | IN_PROGRESS | 1 | agent-1 | |
 | P3 | 3.1–3.6 | TODO | 1 | agent-1 | |
 
 README obligation: 1.9 (README rewrite), then 2.5, 3.6, 4.4, 5.5 and 6.5 add sections.
