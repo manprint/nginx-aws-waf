@@ -26,6 +26,7 @@ type Filter struct {
 	UserClass  string
 	Status     int
 	RID        string
+	Node       string
 	Limit      int
 }
 
@@ -60,6 +61,7 @@ func AddFilterFlags(fs *flag.FlagSet, defSince string, defLimit int) *FilterFlag
 	fs.StringVar(&ff.f.UserClass, "user-class", "", "user class (backend|website|static|realtime|other)")
 	fs.IntVar(&ff.f.Status, "status", 0, "HTTP status")
 	fs.StringVar(&ff.f.RID, "rid", "", "request id")
+	fs.StringVar(&ff.f.Node, "node", "", "node id (multi-node central)")
 	fs.IntVar(&ff.f.Limit, "limit", defLimit, "max rows (1-100000)")
 	return ff
 }
@@ -182,6 +184,7 @@ func (f Filter) Where() (string, map[string]string) {
 	add(f.PathPrefix, "startsWith(path, {path_prefix:String})", "path_prefix")
 	add(f.UserClass, "user_class = {user_class:String}", "user_class")
 	add(f.RID, "request_id = {rid:String}", "rid")
+	add(f.Node, "node_id = {node:String}", "node")
 	if f.Status != 0 {
 		p["status"] = strconv.Itoa(f.Status)
 		c = append(c, "status = {status:UInt16}")

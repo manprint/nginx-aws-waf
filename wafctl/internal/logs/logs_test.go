@@ -22,19 +22,19 @@ func parse(t *testing.T, args ...string) (Filter, error) {
 func TestQ1_FiltersArePlaceholders(t *testing.T) {
 	evil := "x' OR 1=1 --"
 	f, err := parse(t, "--site", "demo", "--site", evil, "--action", "BLOCK", "--shadow", "BLOCK", "--rule", "Evil'Rule",
-		"--ip", "2001:db8::1", "--country", "G'B", "--path-prefix", "/a'b", "--user-class", "web'site", "--status", "403", "--rid", "r'id", "--limit", "7")
+		"--ip", "2001:db8::1", "--country", "G'B", "--path-prefix", "/a'b", "--user-class", "web'site", "--status", "403", "--rid", "r'id", "--node", "n'1", "--limit", "7")
 	if err != nil {
 		t.Fatal(err)
 	}
 	where, p := f.Where()
 	sql := SearchSQL(where)
-	for _, v := range []string{evil, "Evil'Rule", "2001:db8::1", "G'B", "/a'b", "web'site", "r'id", "demo", "403"} {
+	for _, v := range []string{evil, "Evil'Rule", "2001:db8::1", "G'B", "/a'b", "web'site", "r'id", "n'1", "demo", "403"} {
 		if strings.Contains(sql, v) {
 			t.Errorf("value %q appears in SQL: %s", v, sql)
 		}
 	}
 	for _, ph := range []string{"{site:Array(String)}", "{action:String}", "{shadow:String}", "{rule:String}", "{ip:String}", "{country:String}",
-		"{path_prefix:String}", "{user_class:String}", "{status:UInt16}", "{rid:String}", "{from_ms:Int64}", "{to_ms:Int64}", "{limit:UInt32}"} {
+		"{path_prefix:String}", "{user_class:String}", "{status:UInt16}", "{rid:String}", "{node:String}", "{from_ms:Int64}", "{to_ms:Int64}", "{limit:UInt32}"} {
 		if !strings.Contains(sql, ph) {
 			t.Errorf("placeholder %s missing", ph)
 		}

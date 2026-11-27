@@ -327,3 +327,20 @@
 - NEW docs/multi-node.md (Italian): topology (on-prem / AWS / tailnet), ports and firewall, PKI layout and modes, init, token/enroll (pinning), renew, revoke (10 s session drop), the expired-CRL warning with check commands, CA backup (offline, encrypted), install (release → install-node → bootstrap), Tailscale, Terraform, the two-node lab.
 - WRITE README.md: Multi-nodo section, directory map, doc index. WRITE docs/operations.md: systemd table with node-renew, pki-crl and pki.
 - G-U55: `make tf-validate` → "Success! The configuration is valid."; fmt -check clean.
+
+## P5 attempt 1 — PHASE 5 DONE (27-11-2026 UTC, agent-1:opus)
+- G-P5:
+  - `make test-unit`: 14 packages ok, 0 FAIL.
+  - `make lab-up`: rc 0.
+  - `tests/e2e/multinode.sh`: ALL PASS (21 checks).
+  - `tests/e2e/bootstrap.sh`: ALL PASS.
+  - `make tf-validate`: Success!
+- G-SEC: `git ls-files` and `git log --all --name-only` show no .pem, .key, secrets.env, tokens.json or apprise-urls.txt, apart from the allowed lab apprise file.
+- Regression: smoke, apply, central, metrics, cli, grafana, pki and alerts ALL PASS; check-dashboards ALL PASS.
+- Phase fix: the second lab node now writes lab-node-2 events into the shared ClickHouse. cli.sh T-Q5 and X-* compared ClickHouse (all nodes) against node 1's raw dir. Fix: new `--node ID` filter on logs search/export/stats (`node_id = {node:String}` parameter; TestQ1 extended with an injection value and the placeholder). cli.sh now scopes those checks to `--node lab-node-1`. docs/observability.md updated.
+- Review (self-review, security):
+  - I-8: no compose service mounts `$WAF_CONFIG_DIR` or the PKI. The ingress mounts only `central/ingress/certs` (ingress.pem/key, ca.pem, crl.pem). `pki serve` runs on the host (systemd).
+  - Modes: private/ 700; ca.key, tokens.json, ingress.key, node.key and secrets.env 600; certs/_node 700.
+  - Tokens: sha256 only, constant-time compare, single use, bound to a CN, and never burned by an invalid or mismatching CSR.
+  - Revocation: verified end to end (0 events after the revoke, ingress logs "certificate revoked"); the CRL timer is in place and documented.
+  - Docs: multi-node.md warns about an expired CRL and covers the CA backup.

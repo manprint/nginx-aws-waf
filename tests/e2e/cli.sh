@@ -14,7 +14,8 @@ for ((i=0; i<30; i++)); do
   (( got >= nblock )) && break; sleep 1
 done
 
-# --- 3.2 logs search / show / --raw (G-U32, T-Q5)
+# --- 3.2 logs search / show / --raw (G-U32, T-Q5); --node: the raw dir holds only this node's
+# events while ClickHouse also has lab-node-2's (tests/e2e/multinode.sh)
 check "Q-search-blocks-demo ($got >= $nblock)" test "$got" -ge "$nblock"
 one=$("$W" logs search --since 15m --site demo --action BLOCK --rule NoUserAgent_HEADER --format json --limit 1 | jq -r '.[0].request_id // empty')
 check "Q-search-rule-filter" test -n "$one"
@@ -22,17 +23,17 @@ nm=$("$W" logs show "$one" --format json | jq '.matches | length')
 check "Q-show-matches ($nm)" test "${nm:-0}" -ge 1
 from=$(date -u -d '-15 min' +%Y-%m-%dT%H:%M:%SZ); to=$(date -u -d '-5 sec' +%Y-%m-%dT%H:%M:%SZ)
 sleep 6
-a=$("$W" logs search --from "$from" --to "$to" --format json --limit 100000 | jq length)
-b=$("$W" logs search --from "$from" --to "$to" --format json --limit 100000 --raw "$RAW" | jq length)
+a=$("$W" logs search --from "$from" --to "$to" --node lab-node-1 --format json --limit 100000 | jq length)
+b=$("$W" logs search --from "$from" --to "$to" --node lab-node-1 --format json --limit 100000 --raw "$RAW" | jq length)
 check "T-Q5-raw-same-count ($a = $b)" test "$a" = "$b"
 
 # --- 3.3 logs export (G-U33)
-x=$(mktemp); "$W" logs export --from "$from" --to "$to" --format aws -o "$x" 2>/dev/null
+x=$(mktemp); "$W" logs export --from "$from" --to "$to" --node lab-node-1 --format aws -o "$x" 2>/dev/null
 ok=$(jq -e .httpRequest.requestId "$x" >/dev/null && echo 1 || echo 0); xn=$(wc -l < "$x")
 check "X-aws-lines-parse" test "$ok" = 1
 check "X-aws-count-eq-search ($xn = $a)" test "$xn" = "$a"
 check "X-aws-terminating-group" grep -q '"terminatingRule":{"ruleId":"NoUserAgent_HEADER","action":"BLOCK"}' "$x"
-"$W" logs export --from "$from" --to "$to" --format csv -o "$x" 2>/dev/null; cn=$(( $(wc -l < "$x") - 1 ))
+"$W" logs export --from "$from" --to "$to" --node lab-node-1 --format csv -o "$x" 2>/dev/null; cn=$(( $(wc -l < "$x") - 1 ))
 check "X-csv-count ($cn = $a)" test "$cn" = "$a"
 "$W" logs export --from "$from" --to "$to" --format jsonl --with-matches --gzip -o "$x" 2>/dev/null
 jm=$(zcat "$x" | jq -s '[.[] | select(.match_count > 0 and (.matches|length) > 0)] | length')

@@ -9,10 +9,10 @@ Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn br
 - Settings: autonomy true (plan) · WIP on (plan) · deadline none
 - Stop latch: none
 - Scope: plan 001 · RUNNING · overrides none
-- Unit: phase P5/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
+- Unit: sub-phase 6.1/1 · OPEN · step S1 · assigned agent-1 → actual agent-1:opus
 - Base: HEAD 7893ede + clean tree · branch main · last WIP tree none
-- Last closure: unit:5.5:1
-- Next: open P5 · next eligible: P5
+- Last closure: unit:P5:1
+- Next: open 6.1 · next eligible: 6.1
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -124,8 +124,8 @@ none
 | 2 | DONE | 1 | 2.1–2.5 | unit:P2:1 |
 | 3 | DONE | 1 | 3.1–3.6 | unit:P3:1 |
 | 4 | DONE | 1 | 4.1–4.4 | unit:P4:1 |
-| 5 | IN_PROGRESS | 1 | 5.1–5.5 | — |
-| 6 | TODO | 1 | 6.1–6.5 | — |
+| 5 | DONE | 1 | 5.1–5.5 | unit:P5:1 |
+| 6 | IN_PROGRESS | 1 | 6.1–6.5 | — |
 | PLAN | TODO | 1 | — | — |
 
 Phase 1: DONE (unit:P1:1), 1.1–1.9 DONE attempt 1.
@@ -136,15 +136,17 @@ Phase 3: DONE (unit:P3:1), 3.1–3.6 DONE attempt 1.
 
 Phase 4: DONE (unit:P4:1), 4.1–4.4 DONE attempt 1.
 
-Phase 5 (expanded):
+Phase 5: DONE (unit:P5:1), 5.1–5.5 DONE attempt 1.
+
+Phase 6 (expanded):
 | ID | Depends | Status | Attempt | Assigned | Ref / note |
 |----|---------|--------|---------|----------|------------|
-| 5.1 | P3 | DONE | 1 | agent-1 | unit:5.1:1 |
-| 5.2 | 5.1 | DONE | 1 | agent-1 | unit:5.2:1 |
-| 5.3 | 5.2 | DONE | 1 | agent-1 | unit:5.3:1 |
-| 5.4 | 5.3 | DONE | 1 | agent-1 | unit:5.4:1 |
-| 5.5 | 5.4 | DONE | 1 | agent-1 | unit:5.5:1 |
-| P5 | 5.1–5.5 | IN_PROGRESS | 1 | agent-1 | |
+| 6.1 | P1, P3 | IN_PROGRESS | 1 | agent-1 | |
+| 6.2 | 6.1 | TODO | 1 | agent-1 | |
+| 6.3 | 6.2 | TODO | 1 | agent-1 | |
+| 6.4 | 6.3 | TODO | 1 | agent-1 | |
+| 6.5 | 6.4 | TODO | 1 | agent-1 | |
+| P6 | 6.1–6.5 | TODO | 1 | agent-1 | |
 
 README obligation: 1.9 (README rewrite), then 2.5, 3.6, 4.4, 5.5 and 6.5 add sections.
 Open corrections: none. Open audits: none.

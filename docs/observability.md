@@ -139,6 +139,7 @@ Filtri comuni:
 | `--from T [--to T]` | RFC3339 con fuso obbligatorio (`Z` o `+01:00`); senza fuso è un errore |
 | `--action`, `--shadow`, `--rule NAME [--matched]` | `--rule` cerca la regola terminante; con `--matched` qualsiasi regola matchata |
 | `--ip`, `--country`, `--path-prefix`, `--user-class`, `--status`, `--rid` | |
+| `--node ID` | solo gli eventi di un nodo (centrale multi-nodo; `--raw` legge comunque solo i file del nodo locale) |
 | `--limit N` | default 100, massimo 100000 |
 
 ### Statistiche
