@@ -145,3 +145,8 @@
   - Disk buffer of fwd_central adds up to ~10 s after idle (memory buffer: steady 3 s); disk buffer kept (durability, plan). central.sh therefore warms the pipeline before T-C1 (first-event idle latency printed, 4–13 s) and T-C2 waits up to 30 s; T-C1 still requires all corpus events within 10 s of the run.
 - Observed header-key case in waf.events.request_headers: original case (`X-Waf-Test`).
 - G-U31: TestC0_ForwardRender, TestC0_MetaSingleLine, TestSEC1_ PASS; central.sh ALL PASS 3/3 consecutive runs (T-C1 62/62 ≤ 10 s, matches 62, heartbeat, GB, SE + ASN 29518, agg ≥ 62). smoke/apply/joinlog still ALL PASS.
+
+## 3.2 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW internal/ch/{ch,raw,schema,ch_test}.go + internal/ch/migrations/001-schema.sql (embedded copy of deploy/clickhouse/initdb/001-schema.sql; go:embed cannot reach outside the module — TestQ4_ asserts byte identity), internal/logs/{query,search,show,tail,logs_test}.go, tests/e2e/cli.sh (3.2 section; 3.3–3.5 append). cmd: `logs search|show|tail` (+ `--raw DIR`), usage text.
+- Design notes: window = `fromUnixTimestamp64Milli({from_ms:Int64},'UTC')` (no server-timezone parsing); sites as `{site:Array(String)}` with escaped literal; `--rule` = exact or `/NAME` suffix of terminating_rule (covers `custom:site/Name`), `--matched` = subquery on waf.matches; `output_format_json_quote_64bit_integers=0`. Raw mode defines waf.events/waf.matches as views over `/raw/*/…jsonl` and waf.agg_* as views with the MV SELECTs from the DDL, so the identical SQL runs offline.
+- G-U32: TestQ1_, TestQ2_, TestQ3_ (×2), TestQ4_ (47 events columns, counted from the DDL) PASS; cli.sh ALL PASS (search blocks demo 531 ≥ 44, rule filter, show → 2 matches, T-Q5 raw = CH 2866 = 2866).
