@@ -1,0 +1,9 @@
+version: 1
+name: api
+description: "REST/JSON API (machine clients): web-common with missing User-Agent and large bodies counted instead of blocked (aws-compatible)."
+extends: web-common
+# Client non-browser (script, integrazioni, app) spesso non mandano User-Agent e inviano JSON > 8 KB.
+# Per ispezionare body più grandi: body_limit: 16384 (fino a 65536 compatibile AWS).
+rule_groups:
+  - name: AWSManagedRulesCommonRuleSet
+    rule_action_overrides: {NoUserAgent_HEADER: count, SizeRestrictions_BODY: count}

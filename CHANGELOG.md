@@ -1,5 +1,20 @@
 # Changelog
 
+## Non rilasciato
+
+### Protezione per tipo di sito
+- Sei nuovi gruppi opzionali nel catalogo, dai rule group AWS "use-case"/"OS":
+  AdminProtection, Linux, Unix (POSIX), Windows, PHP, WordPress (25 regole, fidelity `approx`;
+  ID 1410000–1470099). Nuovo file dati `waf/data/linux-lfi.data`.
+- Nuovi profili: `web-common` (base per qualunque sito), `php`, `wordpress`, `static`, `api`,
+  `aspnet`. Bloccano anche file riservati (`.env`, `.git`, backup), sonde degli scanner, webshell,
+  phpMyAdmin, enumerazione utenti WordPress. Tutto disattivabile per sito.
+- `app: wordpress`: classificazione `user_class` (backend/api/static/website) nella pipeline Vector.
+- `rule_groups[].enabled: false` spegne senza avvisi un gruppo abilitato da un profilo padre.
+- Scope-down: ID `1600000 + siteIdx·1000 + groupIdx·10` (prima `·100`, bastava per < 10 gruppi).
+- Stack Odoo: `waf_causa` descrive in italiano le nuove regole.
+- Corpus `tests/corpus/profiles.yaml` (siti di lab `p-<profilo>`).
+
 ## 0.1.0 — 27-11-2026
 
 Prima versione completa (piano 001). Riproduce la web ACL AWS WAF "one-click" per ALB su nginx +

@@ -102,9 +102,15 @@ transforms:
       ev.rate_limit_status = string(a.rl) ?? ""
       ev.waf_inspected = if exists(.audit) { 1 } else { 0 }
 
-      # --- user class (Odoo-aware)
+      # --- user class (Odoo/WordPress-aware)
       p = downcase(ev.path)
-      ev.user_class = if ev.app != "odoo" { "other" }
+      ev.user_class = if ev.app == "wordpress" {
+          if match(p, r'^/(wp-content|wp-includes)/') || match(p, r'\.(css|js|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|map)$') { "static" }
+          else if match(p, r'^/(wp-json/|xmlrpc\.php)') || contains(downcase(ev.query), "rest_route=") { "api" }
+          else if match(p, r'^/(wp-admin/|wp-login\.php)') { "backend" }
+          else { "website" }
+        }
+        else if ev.app != "odoo" { "other" }
         else if match(p, r'^/(web/(static|assets|image|content)|website/static|[a-z_]+/static)/') { "static" }
         else if match(p, r'^/(longpolling|websocket)') { "realtime" }
         else if match(p, r'^/(xmlrpc|jsonrpc|json/|api/)') { "api" }

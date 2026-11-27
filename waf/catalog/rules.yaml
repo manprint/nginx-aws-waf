@@ -383,3 +383,221 @@ groups:
         fidelity: approx
         detectors:
           - [{vars: "TX:raw_path", op: "@detectSQLi", t: [utf8toUnicode, urlDecodeUni, removeNulls]}]
+
+  # ---- AWS use-case groups (optional): enable them in a site/profile with rule_groups[].enabled: true
+  - key: admin
+    name: AWSManagedRulesAdminProtectionRuleSet
+    vendor: AWS
+    wcu: 100
+    label_ns: "awswaf:managed:aws:admin-protection:"
+    optional: true
+    rules:
+      - id: 1410010
+        name: AdminProtection_URIPATH
+        label: AdminProtection_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@rx ^/(?:admin|administrator|admin-console|admincp|adminpanel|admin[-_]?area|siteadmin|webadmin|cpanel|whm|controlpanel|phpmyadmin|pma|myadmin|mysqladmin|sqlmanager|sqladmin|sqlweb|dbadmin|adminer(?:-[0-9.]+)?(?:\.php)?|manager/html|host-manager|jmx-console|web-console|axis2-admin|solr/admin|_profiler|elmah\.axd|trace\.axd|server-status|server-info|actuator|wp-admin|typo3|bitrix/admin|umbraco|sitecore/admin)(?:[/.?;]|$)', t: [utf8toUnicode, urlDecodeUni, normalizePath, removeNulls, lowercase]}]
+  - key: linux
+    name: AWSManagedRulesLinuxRuleSet
+    vendor: AWS
+    wcu: 200
+    label_ns: "awswaf:managed:aws:linux-os:"
+    optional: true
+    rules:
+      - id: 1420010
+        name: LFI_URIPATH
+        label: LFI_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@pmFromFile /etc/waf/data/linux-lfi.data', t: [utf8toUnicode, urlDecodeUni, normalizePath, removeNulls, lowercase]}]
+      - id: 1420020
+        name: LFI_QUERYSTRING
+        label: LFI_QueryString
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "QUERY_STRING", op: '@pmFromFile /etc/waf/data/linux-lfi.data', t: [utf8toUnicode, urlDecodeUni, normalizePath, removeNulls, lowercase]}]
+      - id: 1420030
+        name: LFI_HEADER
+        label: LFI_Header
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_HEADERS", op: '@pmFromFile /etc/waf/data/linux-lfi.data', t: [utf8toUnicode, urlDecodeUni, normalizePath, removeNulls, lowercase]}]
+  - key: unix
+    name: AWSManagedRulesUnixRuleSet
+    vendor: AWS
+    wcu: 100
+    label_ns: "awswaf:managed:aws:posix-os:"
+    optional: true
+    rules:
+      - id: 1430010
+        name: UNIXShellCommandsVariables_QUERYSTRING
+        label: UNIXShellCommandsVariables_QueryString
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "QUERY_STRING", op: '@rx (?:^|[;|`\n\r]|\$\(|&&)\s*(?:id|whoami|uname(?:\s+-\w+)?|ifconfig|hostname|pwd|env|printenv|ps(?:\s+-?\w+)?|sleep\s+\d+|ping\s+-[cn]\s*\d+\s+\S+)\s*(?:$|[;|&`)#\n\r])|(?:^|[;|&`\n\r=(]|\$\(|\|\|)\s*(?:(?:cat|more|less|head|tail|nl|tac|strings|od|xxd|base64|ls)\s+(?:-\S+\s+)*[\w.~*-]*/[\w./*-]*|(?:wget|curl|fetch|lwp-download|tftp)\s+(?:-\S+\s+)*\S*(?:https?|ftp|tftp)://|(?:nc|ncat|netcat|socat|telnet)\s+(?:-\S+\s+)*[\w.-]+\s+\d{1,5}\b|(?:ba|z|k|c|tc|da)?sh\s+-c\s*[\x22\x27]|(?:ba|z|k|c|tc|da)?sh\s+-i\s*[<>&]|(?:python[23]?|perl|ruby|php|node|lua)\s+-[ecr]\s*[\x22\x27]|(?:chmod|chown)\s+(?:-\S+\s+)*(?:[0-7]{3,4}|[ugoa]*[+=][rwxs]+)\s|rm\s+-[rf]{1,2}\s|echo\s+[\x22\x27]?\$\{?\w|nslookup\s+\S|mkfifo\s|crontab\s+-)|/bin/(?:ba|z|k|c|tc|da)?sh\b|/usr/bin/(?:env|perl|python[23]?|wget|curl|nc)\b|\$\{?ifs\}?|\$\{(?:home|path|shell|user|pwd)\}|\$\((?:id|whoami|uname|cat|curl|wget|sleep)\b|`(?:id|whoami|uname|cat|curl|wget|sleep)\b[^`]*`', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1430020
+        name: UNIXShellCommandsVariables_BODY
+        label: UNIXShellCommandsVariables_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx (?:^|[;|`\n\r]|\$\(|&&)\s*(?:id|whoami|uname(?:\s+-\w+)?|ifconfig|hostname|pwd|env|printenv|ps(?:\s+-?\w+)?|sleep\s+\d+|ping\s+-[cn]\s*\d+\s+\S+)\s*(?:$|[;|&`)#\n\r])|(?:^|[;|&`\n\r=(]|\$\(|\|\|)\s*(?:(?:cat|more|less|head|tail|nl|tac|strings|od|xxd|base64|ls)\s+(?:-\S+\s+)*[\w.~*-]*/[\w./*-]*|(?:wget|curl|fetch|lwp-download|tftp)\s+(?:-\S+\s+)*\S*(?:https?|ftp|tftp)://|(?:nc|ncat|netcat|socat|telnet)\s+(?:-\S+\s+)*[\w.-]+\s+\d{1,5}\b|(?:ba|z|k|c|tc|da)?sh\s+-c\s*[\x22\x27]|(?:ba|z|k|c|tc|da)?sh\s+-i\s*[<>&]|(?:python[23]?|perl|ruby|php|node|lua)\s+-[ecr]\s*[\x22\x27]|(?:chmod|chown)\s+(?:-\S+\s+)*(?:[0-7]{3,4}|[ugoa]*[+=][rwxs]+)\s|rm\s+-[rf]{1,2}\s|echo\s+[\x22\x27]?\$\{?\w|nslookup\s+\S|mkfifo\s|crontab\s+-)|/bin/(?:ba|z|k|c|tc|da)?sh\b|/usr/bin/(?:env|perl|python[23]?|wget|curl|nc)\b|\$\{?ifs\}?|\$\{(?:home|path|shell|user|pwd)\}|\$\((?:id|whoami|uname|cat|curl|wget|sleep)\b|`(?:id|whoami|uname|cat|curl|wget|sleep)\b[^`]*`', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1430030
+        name: UNIXShellCommandsVariables_HEADER
+        label: UNIXShellCommandsVariables_Header
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_HEADERS", op: '@rx (?:^|[;|`\n\r]|\$\(|&&)\s*(?:id|whoami|uname(?:\s+-\w+)?|ifconfig|hostname|pwd|env|printenv|ps(?:\s+-?\w+)?|sleep\s+\d+|ping\s+-[cn]\s*\d+\s+\S+)\s*(?:$|[;|&`)#\n\r])|(?:^|[;|&`\n\r=(]|\$\(|\|\|)\s*(?:(?:cat|more|less|head|tail|nl|tac|strings|od|xxd|base64|ls)\s+(?:-\S+\s+)*[\w.~*-]*/[\w./*-]*|(?:wget|curl|fetch|lwp-download|tftp)\s+(?:-\S+\s+)*\S*(?:https?|ftp|tftp)://|(?:nc|ncat|netcat|socat|telnet)\s+(?:-\S+\s+)*[\w.-]+\s+\d{1,5}\b|(?:ba|z|k|c|tc|da)?sh\s+-c\s*[\x22\x27]|(?:ba|z|k|c|tc|da)?sh\s+-i\s*[<>&]|(?:python[23]?|perl|ruby|php|node|lua)\s+-[ecr]\s*[\x22\x27]|(?:chmod|chown)\s+(?:-\S+\s+)*(?:[0-7]{3,4}|[ugoa]*[+=][rwxs]+)\s|rm\s+-[rf]{1,2}\s|echo\s+[\x22\x27]?\$\{?\w|nslookup\s+\S|mkfifo\s|crontab\s+-)|/bin/(?:ba|z|k|c|tc|da)?sh\b|/usr/bin/(?:env|perl|python[23]?|wget|curl|nc)\b|\$\{?ifs\}?|\$\{(?:home|path|shell|user|pwd)\}|\$\((?:id|whoami|uname|cat|curl|wget|sleep)\b|`(?:id|whoami|uname|cat|curl|wget|sleep)\b[^`]*`', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+  - key: windows
+    name: AWSManagedRulesWindowsRuleSet
+    vendor: AWS
+    wcu: 200
+    label_ns: "awswaf:managed:aws:windows-os:"
+    optional: true
+    rules:
+      - id: 1440010
+        name: WindowsShellCommands_HEADER
+        label: WindowsShellCommands_Header
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_HEADERS", op: '@rx (?:^|[;|&`\n\r=(]|\|\||&&)\s*(?:cmd(?:\.exe)?\s*/[ckr]\b|(?:powershell|pwsh)(?:\.exe)?\s+-|net\s+(?:user|localgroup|group|view|share|use)\b|ipconfig(?:\s+/all)?\s*(?:$|[;|&])|systeminfo\b|tasklist\b|taskkill\s+/|certutil(?:\.exe)?\s+-(?:urlcache|decode|encode)|bitsadmin(?:\.exe)?\s+/transfer|wmic\s+\w|reg(?:\.exe)?\s+(?:add|query|delete|save)\s+h|(?:type|dir|copy|del)\s+[a-z]:\\|nslookup\s+\S|ping\s+-n\s+\d+|(?:mshta|rundll32|regsvr32)(?:\.exe)?\s|schtasks(?:\.exe)?\s+/)|\b(?:cmd|powershell|mshta|rundll32|regsvr32|certutil|bitsadmin)\.exe\b|%(?:comspec|systemroot|windir|programfiles|userprofile|temp)%|[a-z]:\\windows\\system32\\', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1440020
+        name: WindowsShellCommands_QUERYARGUMENTS
+        label: WindowsShellCommands_QueryArguments
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "ARGS_GET", op: '@rx (?:^|[;|&`\n\r=(]|\|\||&&)\s*(?:cmd(?:\.exe)?\s*/[ckr]\b|(?:powershell|pwsh)(?:\.exe)?\s+-|net\s+(?:user|localgroup|group|view|share|use)\b|ipconfig(?:\s+/all)?\s*(?:$|[;|&])|systeminfo\b|tasklist\b|taskkill\s+/|certutil(?:\.exe)?\s+-(?:urlcache|decode|encode)|bitsadmin(?:\.exe)?\s+/transfer|wmic\s+\w|reg(?:\.exe)?\s+(?:add|query|delete|save)\s+h|(?:type|dir|copy|del)\s+[a-z]:\\|nslookup\s+\S|ping\s+-n\s+\d+|(?:mshta|rundll32|regsvr32)(?:\.exe)?\s|schtasks(?:\.exe)?\s+/)|\b(?:cmd|powershell|mshta|rundll32|regsvr32|certutil|bitsadmin)\.exe\b|%(?:comspec|systemroot|windir|programfiles|userprofile|temp)%|[a-z]:\\windows\\system32\\', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1440030
+        name: WindowsShellCommands_QUERYSTRING
+        label: WindowsShellCommands_QueryString
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "QUERY_STRING", op: '@rx (?:^|[;|&`\n\r=(]|\|\||&&)\s*(?:cmd(?:\.exe)?\s*/[ckr]\b|(?:powershell|pwsh)(?:\.exe)?\s+-|net\s+(?:user|localgroup|group|view|share|use)\b|ipconfig(?:\s+/all)?\s*(?:$|[;|&])|systeminfo\b|tasklist\b|taskkill\s+/|certutil(?:\.exe)?\s+-(?:urlcache|decode|encode)|bitsadmin(?:\.exe)?\s+/transfer|wmic\s+\w|reg(?:\.exe)?\s+(?:add|query|delete|save)\s+h|(?:type|dir|copy|del)\s+[a-z]:\\|nslookup\s+\S|ping\s+-n\s+\d+|(?:mshta|rundll32|regsvr32)(?:\.exe)?\s|schtasks(?:\.exe)?\s+/)|\b(?:cmd|powershell|mshta|rundll32|regsvr32|certutil|bitsadmin)\.exe\b|%(?:comspec|systemroot|windir|programfiles|userprofile|temp)%|[a-z]:\\windows\\system32\\', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1440040
+        name: WindowsShellCommands_URIPATH
+        label: WindowsShellCommands_UriPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@rx (?:^|[;|&`\n\r=(]|\|\||&&)\s*(?:cmd(?:\.exe)?\s*/[ckr]\b|(?:powershell|pwsh)(?:\.exe)?\s+-|net\s+(?:user|localgroup|group|view|share|use)\b|ipconfig(?:\s+/all)?\s*(?:$|[;|&])|systeminfo\b|tasklist\b|taskkill\s+/|certutil(?:\.exe)?\s+-(?:urlcache|decode|encode)|bitsadmin(?:\.exe)?\s+/transfer|wmic\s+\w|reg(?:\.exe)?\s+(?:add|query|delete|save)\s+h|(?:type|dir|copy|del)\s+[a-z]:\\|nslookup\s+\S|ping\s+-n\s+\d+|(?:mshta|rundll32|regsvr32)(?:\.exe)?\s|schtasks(?:\.exe)?\s+/)|\b(?:cmd|powershell|mshta|rundll32|regsvr32|certutil|bitsadmin)\.exe\b|%(?:comspec|systemroot|windir|programfiles|userprofile|temp)%|[a-z]:\\windows\\system32\\', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1440050
+        name: WindowsShellCommands_BODY
+        label: WindowsShellCommands_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx (?:^|[;|&`\n\r=(]|\|\||&&)\s*(?:cmd(?:\.exe)?\s*/[ckr]\b|(?:powershell|pwsh)(?:\.exe)?\s+-|net\s+(?:user|localgroup|group|view|share|use)\b|ipconfig(?:\s+/all)?\s*(?:$|[;|&])|systeminfo\b|tasklist\b|taskkill\s+/|certutil(?:\.exe)?\s+-(?:urlcache|decode|encode)|bitsadmin(?:\.exe)?\s+/transfer|wmic\s+\w|reg(?:\.exe)?\s+(?:add|query|delete|save)\s+h|(?:type|dir|copy|del)\s+[a-z]:\\|nslookup\s+\S|ping\s+-n\s+\d+|(?:mshta|rundll32|regsvr32)(?:\.exe)?\s|schtasks(?:\.exe)?\s+/)|\b(?:cmd|powershell|mshta|rundll32|regsvr32|certutil|bitsadmin)\.exe\b|%(?:comspec|systemroot|windir|programfiles|userprofile|temp)%|[a-z]:\\windows\\system32\\', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1440060
+        name: PowerShellCommands_COOKIE
+        label: PowerShellCommands_Cookie
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_COOKIES", op: '@rx \b(?:invoke-(?:expression|webrequest|restmethod|command|item|shellcode|mimikatz|wmimethod)|iex\s*[($]|new-object\s+(?:-typename\s+)?(?:system\.)?net\.(?:webclient|sockets)|\.download(?:string|file|data)\s*\(|start-process\b|start-bitstransfer\b|-enc(?:odedcommand)?\s+[a-z0-9+/=]{16,}|frombase64string\s*\(|set-executionpolicy\b|add-mppreference\b|get-wmiobject\b|\[system\.convert\]::|\[reflection\.assembly\]::load)', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1440070
+        name: PowerShellCommands_QUERYARGUMENTS
+        label: PowerShellCommands_QueryArguments
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "ARGS_GET", op: '@rx \b(?:invoke-(?:expression|webrequest|restmethod|command|item|shellcode|mimikatz|wmimethod)|iex\s*[($]|new-object\s+(?:-typename\s+)?(?:system\.)?net\.(?:webclient|sockets)|\.download(?:string|file|data)\s*\(|start-process\b|start-bitstransfer\b|-enc(?:odedcommand)?\s+[a-z0-9+/=]{16,}|frombase64string\s*\(|set-executionpolicy\b|add-mppreference\b|get-wmiobject\b|\[system\.convert\]::|\[reflection\.assembly\]::load)', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1440080
+        name: PowerShellCommands_BODY
+        label: PowerShellCommands_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx \b(?:invoke-(?:expression|webrequest|restmethod|command|item|shellcode|mimikatz|wmimethod)|iex\s*[($]|new-object\s+(?:-typename\s+)?(?:system\.)?net\.(?:webclient|sockets)|\.download(?:string|file|data)\s*\(|start-process\b|start-bitstransfer\b|-enc(?:odedcommand)?\s+[a-z0-9+/=]{16,}|frombase64string\s*\(|set-executionpolicy\b|add-mppreference\b|get-wmiobject\b|\[system\.convert\]::|\[reflection\.assembly\]::load)', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+  - key: php
+    name: AWSManagedRulesPHPRuleSet
+    vendor: AWS
+    wcu: 100
+    label_ns: "awswaf:managed:aws:php-app:"
+    optional: true
+    rules:
+      - id: 1460010
+        name: PHPHighRiskMethodsVariables_HEADER
+        label: PHPHighRiskMethodsVariables_Header
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_HEADERS", op: '@rx \$_(?:get|post|cookie|request|server|files|env|session)\b|\$globals\b|\b(?:fsockopen|pfsockopen|shell_exec|passthru|proc_open|popen|pcntl_exec|create_function|call_user_func(?:_array)?|assert|eval|system|exec|base64_decode|gzinflate|gzuncompress|gzdecode|str_rot13|file_put_contents|file_get_contents|fopen|fwrite|fputs|move_uploaded_file|phpinfo|unserialize|preg_replace|ini_set|putenv|curl_exec|highlight_file|show_source|readfile)\s*\(\s*(?:[\x22\x27$]|\)|(?:base64_decode|gzinflate|str_rot13|chr|eval)\b)|(?:php|phar|expect|zip|glob|zlib|ssh2\.\w+)://|data:(?://)?text/plain|<\?(?:php|=)|=(?:call_user_func(?:_array)?|shell_exec|passthru|proc_open|pcntl_exec|create_function|phpinfo)(?:&|$)|think\\app/invokefunction|/think/app/invokefunction', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1460020
+        name: PHPHighRiskMethodsVariables_QUERYSTRING
+        label: PHPHighRiskMethodsVariables_QueryString
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "QUERY_STRING", op: '@rx \$_(?:get|post|cookie|request|server|files|env|session)\b|\$globals\b|\b(?:fsockopen|pfsockopen|shell_exec|passthru|proc_open|popen|pcntl_exec|create_function|call_user_func(?:_array)?|assert|eval|system|exec|base64_decode|gzinflate|gzuncompress|gzdecode|str_rot13|file_put_contents|file_get_contents|fopen|fwrite|fputs|move_uploaded_file|phpinfo|unserialize|preg_replace|ini_set|putenv|curl_exec|highlight_file|show_source|readfile)\s*\(\s*(?:[\x22\x27$]|\)|(?:base64_decode|gzinflate|str_rot13|chr|eval)\b)|(?:php|phar|expect|zip|glob|zlib|ssh2\.\w+)://|data:(?://)?text/plain|<\?(?:php|=)|=(?:call_user_func(?:_array)?|shell_exec|passthru|proc_open|pcntl_exec|create_function|phpinfo)(?:&|$)|think\\app/invokefunction|/think/app/invokefunction', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1460030
+        name: PHPHighRiskMethodsVariables_BODY
+        label: PHPHighRiskMethodsVariables_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx \$_(?:get|post|cookie|request|server|files|env|session)\b|\$globals\b|\b(?:fsockopen|pfsockopen|shell_exec|passthru|proc_open|popen|pcntl_exec|create_function|call_user_func(?:_array)?|assert|eval|system|exec|base64_decode|gzinflate|gzuncompress|gzdecode|str_rot13|file_put_contents|file_get_contents|fopen|fwrite|fputs|move_uploaded_file|phpinfo|unserialize|preg_replace|ini_set|putenv|curl_exec|highlight_file|show_source|readfile)\s*\(\s*(?:[\x22\x27$]|\)|(?:base64_decode|gzinflate|str_rot13|chr|eval)\b)|(?:php|phar|expect|zip|glob|zlib|ssh2\.\w+)://|data:(?://)?text/plain|<\?(?:php|=)|=(?:call_user_func(?:_array)?|shell_exec|passthru|proc_open|pcntl_exec|create_function|phpinfo)(?:&|$)|think\\app/invokefunction|/think/app/invokefunction', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1460040
+        name: PHPHighRiskMethodsVariables_URIPATH
+        label: PHPHighRiskMethodsVariables_URIPath
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@rx \$_(?:get|post|cookie|request|server|files|env|session)\b|\$globals\b|\b(?:fsockopen|pfsockopen|shell_exec|passthru|proc_open|popen|pcntl_exec|create_function|call_user_func(?:_array)?|assert|eval|system|exec|base64_decode|gzinflate|gzuncompress|gzdecode|str_rot13|file_put_contents|file_get_contents|fopen|fwrite|fputs|move_uploaded_file|phpinfo|unserialize|preg_replace|ini_set|putenv|curl_exec|highlight_file|show_source|readfile)\s*\(\s*(?:[\x22\x27$]|\)|(?:base64_decode|gzinflate|str_rot13|chr|eval)\b)|(?:php|phar|expect|zip|glob|zlib|ssh2\.\w+)://|data:(?://)?text/plain|<\?(?:php|=)|=(?:call_user_func(?:_array)?|shell_exec|passthru|proc_open|pcntl_exec|create_function|phpinfo)(?:&|$)|think\\app/invokefunction|/think/app/invokefunction', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1460050
+        name: PHP2Shell_BODY
+        label: PHP2Shell_Body
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx (?:^|[^\w])[-\xad]d[\s+]*(?:allow_url_include|auto_prepend_file|auto_append_file|disable_functions|open_basedir|cgi\.force_redirect|register_argc_argv)\s*=', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1460060
+        name: PHP2Shell_BODY_Extended
+        label: PHP2Shell_Body_Extended
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx \b(?:allow_url_include|auto_prepend_file|auto_append_file)\s*=\s*(?:1|on|true|php://|data:|/)', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1460070
+        name: PHPUploadProgressSerializedObject_BODY
+        label: PHPUploadProgressSerializedObject_Body
+        default_action: count
+        fidelity: approx
+        detectors:
+          - [{vars: "REQUEST_BODY", op: '@rx php_session_upload_progress[\s\S]{0,512}?(?:^|[^\w])[oc]:\d+:[\x22\x27]', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1460080
+        name: PHPFPMSmuggling_BODY
+        label: PHPFPMSmuggling_Body
+        default_action: count
+        fidelity: stub
+        detectors: []
+  - key: wordpress
+    name: AWSManagedRulesWordPressRuleSet
+    vendor: AWS
+    wcu: 100
+    label_ns: "awswaf:managed:aws:wordpress-app:"
+    optional: true
+    rules:
+      - id: 1470010
+        name: WordPressExploitableCommands_QUERYSTRING
+        label: WordPressExploitableCommands_QUERYSTRING
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "QUERY_STRING", op: '@rx (?:^|&)(?:action|page|do|task|cmd)=(?:do[-_]reset[-_]wordpress|reset[-_]wordpress|wp_reset|revslider_show_image|duplicator_download|duplicator_init|wpgdprc_process_action|mk_file_folder_manager|wp_file_manager|fm_connector|wps_membership_csv_file_upload|wpestate_ajax_check_facebook_user|aal_data_check|cp_upload)\b|do[-_]reset[-_]wordpress|(?:^|&)img=(?:\.\./)+|(?:^|&)(?:file|path|download)=(?:\.\./)+wp-config', t: [utf8toUnicode, urlDecodeUni, removeNulls, lowercase]}]
+      - id: 1470020
+        name: WordPressExploitablePaths_URIPATH
+        label: WordPressExploitablePaths_URIPATH
+        default_action: block
+        fidelity: approx
+        detectors:
+          - [{vars: "TX:raw_path", op: '@rx (?:^|/)(?:xmlrpc\.php|wp-config\.php[^/]*|wp-admin/(?:install|setup-config)\.php|wp-admin/(?:includes|maint)/[^/]+\.php|wp-content/debug\.log|wp-content/(?:uploads|upgrade|cache|backups?[^/]*)/.*\.(?:php\d?|phtml|pht|phar|phps)|wp-content/plugins/wp-file-manager/lib/php/connector\.minimal\.php|wp-includes/wlwmanifest\.xml)$', t: [utf8toUnicode, urlDecodeUni, normalizePath, removeNulls, lowercase]}]

@@ -1,0 +1,7 @@
+version: 1
+site_id: p-static
+server_names: [static.lab.test]
+app: generic
+upstream: {servers: ["echo:8081"]}
+client_ip: {source: xff, trusted_proxies: ["0.0.0.0/0", "::/0"]}
+profile: static

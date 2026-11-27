@@ -1,0 +1,19 @@
+version: 1
+name: php
+description: "PHP application (Laravel, Symfony, Drupal, Joomla, PrestaShop, Magento, custom): web-common + AWS PHP group, plus blocks of webshell/phpinfo probes and database admin tools (aws-compatible)."
+extends: web-common
+# Per WordPress usa il profilo wordpress (estende questo).
+# Se il sito usa davvero phpMyAdmin o Adminer sullo stesso dominio:   disable_custom_rules: [BlockDbAdminTools]
+rule_groups:
+  - {name: AWSManagedRulesPHPRuleSet, enabled: true}       # iniezione di codice PHP ($_GET, system(), php://input, <?php ...)
+custom_rules:
+  # Webshell e pagine di diagnostica cercate dai bot (phpinfo.php, shell.php, c99.php...) e PHP dentro vendor/ (composer)
+  - name: BlockPhpProbes
+    slot: start
+    action: block
+    match: {all: [{uri_path: {regex: '(?:^|/)(?:phpinfo|php_?info|info|c99|r57|wso\d*|alfa(?:shell)?|b374k|webshell|indoxploit|shell|cmd|xmrlpc|wp-confiq|eval-stdin)\.php$|(?:^|/)vendor/.+\.php$', transform: [urlDecodeUni, lowercase]}}]}
+  # phpMyAdmin, Adminer e simili esposti su Internet
+  - name: BlockDbAdminTools
+    slot: start
+    action: block
+    match: {all: [{uri_path: {regex: '^/(?:phpmyadmin\d*|pma|myadmin|mysqladmin|dbadmin|sqladmin|mysql|adminer(?:-[\d.]+)?(?:-\w+)?(?:\.php)?)(?:/|$)', transform: [urlDecodeUni, lowercase]}}]}

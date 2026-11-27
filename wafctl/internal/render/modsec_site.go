@@ -23,7 +23,7 @@ func customRuleList(w *config.WAF) []config.CustomRule {
 func CustomRuleID(siteIdx, ruleIdx int) int { return 1500000 + siteIdx*1000 + ruleIdx*10 }
 
 // ScopeDownID is the D23 id of the scope-down block of group gi of site siteIdx.
-func ScopeDownID(siteIdx, gi int) int { return 1600000 + siteIdx*100 + gi*10 }
+func ScopeDownID(siteIdx, gi int) int { return 1600000 + siteIdx*1000 + gi*10 }
 
 func (r *renderer) customRules(slot string) ([]string, error) {
 	var out []string

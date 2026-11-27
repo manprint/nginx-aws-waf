@@ -1,0 +1,27 @@
+version: 1
+name: web-common
+description: "Generic website on Linux: aws-default + SQLi + Linux + POSIX groups, plus blocks of sensitive files, scanner/exploit probes and debug HTTP methods (aws-compatible)."
+extends: aws-default
+# Base per qualunque sito web (Node, Python, Ruby, Go, Java, PHP...). Profili più specifici: php, wordpress, static, api, aspnet.
+# Ogni regola si può disattivare nel file del sito:   disable_custom_rules: [BlockScannerProbes]
+# oppure mettere in solo log ridefinendola con lo stesso nome e action: count.
+rule_groups:
+  - {name: AWSManagedRulesSQLiRuleSet, enabled: true}      # SQL injection (query, body, cookie, header, path)
+  - {name: AWSManagedRulesLinuxRuleSet, enabled: true}     # lettura di file di sistema Linux (/etc/passwd, /proc/self/...)
+  - {name: AWSManagedRulesUnixRuleSet, enabled: true}      # command injection Unix (;id, $(curl ...), /bin/sh -c ...)
+custom_rules:
+  # File che non devono mai essere pubblici: .env, .git/.svn, chiavi SSH, .htaccess, composer/package.json, docker-compose, backup e dump
+  - name: BlockSensitiveFiles
+    slot: start
+    action: block
+    match: {all: [{uri_path: {regex: '(?:^|/)\.(?:git|svn|hg|bzr|aws|ssh|kube|idea|vscode|docker)(?:/|$)|(?:^|/)(?:\.(?:env(?:\.[\w.-]+)?|gitignore|gitconfig|ds_store|htaccess|htpasswd|user\.ini|npmrc|yarnrc|dockerenv|bash_history|mysql_history|psql_history|python_history)|(?:composer|package)(?:-lock)?\.json|composer\.lock|yarn\.lock|docker-compose(?:\.[\w-]+)?\.ya?ml|dockerfile|web\.config|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?|(?:backup|backups|dump|database|db|site|www|htdocs|public_html|wwwroot|data|sql)\.(?:zip|tar|tgz|tar\.gz|gz|bz2|rar|7z|sql|sql\.gz|bak))$', transform: [urlDecodeUni, lowercase]}}]}
+  # Percorsi cercati dagli scanner di exploit (phpunit, Spring actuator, Laravel ignition, router/VPN, WebLogic, Tomcat manager...)
+  - name: BlockScannerProbes
+    slot: start
+    action: block
+    match: {all: [{uri_path: {regex: '^/(?:cgi-bin/|vendor/phpunit/|hnap1(?:/|$)|boaform/|gponform/|actuator(?:/|$)|_ignition/|telescope/requests|debug/default/view|jmx-console|invoker/(?:jmx|ejb)invokerservlet|wls-wsat/|_async/asyncresponseservice|remote/fgt_lang|\+cscoe\+/|dana-na/|mifs/|global-protect/(?:login|portal)\.esp|sslvpn_logon\.shtml|cf_scripts/|setup\.cgi|server-(?:status|info)(?:/|$)|_profiler/|console/(?:login/loginform\.jsp|css/)|manager/(?:html|text)(?:/|$)|ws_utc/|druid/index\.html|nacos/|solr/admin|owa/auth/x\.js|autodiscover/autodiscover\.json|stalker_portal/|ztp/cgi-bin|shell$)', transform: [urlDecodeUni, lowercase]}}]}
+  # Metodi di debug: TRACE/TRACK (cross-site tracing), DEBUG (IIS), CONNECT (proxy)
+  - name: BlockDebugMethods
+    slot: start
+    action: block
+    match: {all: [{method: [TRACE, TRACK, DEBUG, CONNECT]}]}

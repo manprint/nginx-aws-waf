@@ -135,7 +135,7 @@ Novità per versione: [CHANGELOG.md](CHANGELOG.md).
 |---|---|
 | `waf/` | catalogo regole, file dati, pagine 403/500, Dockerfile del motore |
 | `wafctl/` | CLI Go (`validate`, `render`, `apply`, `diff`, `explain`, `bypass`, `test`, `logs`, `stats`, `report`, `ch`, `secrets`, `central`, `grafana`, `pki`, `node`, `export-aws`, `lists`, `catalog`) |
-| `profiles/` | profili di prodotto (`aws-default`, `shadow`, `strict`, `odoo-*`) |
+| `profiles/` | profili di prodotto (`aws-default`, `shadow`, `strict`, `web-common`, `php`, `wordpress`, `static`, `api`, `aspnet`, `odoo-*`) |
 | `lab/config/` | configurazione del nodo di lab (`node.yaml`, `sites/`); `lab/config-node2/` è il secondo nodo del lab multi-nodo |
 | `deploy/compose/` | compose del nodo (`node.yml` + `node.host.yml` / `node.bridge.yml`), del centrale (`central.yml` con l'ingress mTLS, `central.bridge.yml`, `central.host.yml`), lab |
 | `deploy/clickhouse/` | schema iniziale, utenti, config di ClickHouse |

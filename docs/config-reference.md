@@ -44,7 +44,7 @@ Esempio (lab): `lab/config/node.yaml`.
 | `version` | int | — (1) | — | |
 | `site_id` | `^[a-z0-9][a-z0-9_-]{0,31}$` | — | — | deve coincidere col nome file |
 | `server_names` | lista | — | — | nomi `^[a-z0-9*.-]+$` (no IPv6 tra parentesi) |
-| `app` | `odoo` \| `generic` | — | — | `odoo` aggiunge la location realtime |
+| `app` | `odoo` \| `wordpress` \| `generic` | — | — | `odoo` aggiunge la location realtime; `odoo` e `wordpress` classificano le richieste (`user_class`: backend, api, static, website) |
 | `profile` | nome | `aws-default` | — | catena `extends` risolta root → foglia |
 | `upstream.servers` | lista `host:porta` | — | — | |
 | `upstream.realtime.path` / `.servers` | string / lista | — | — | Odoo: `/longpolling` (12, 14) o `/websocket` (16, 18), porta 8072 |
@@ -80,8 +80,8 @@ padre. `rule_groups` e `custom_rules` si fondono per nome (stesso nome = sostitu
 
 | Chiave | Tipo | Note |
 |---|---|---|
-| `name` | nome AWS del gruppo | `AWSManagedRulesAmazonIpReputationList`, `AWSManagedRulesCommonRuleSet`, `AWSManagedRulesKnownBadInputsRuleSet`, opzionali `AWSManagedRulesSQLiRuleSet`, `AWSManagedRulesAnonymousIpList` |
-| `enabled` | bool | i gruppi opzionali partono disabilitati |
+| `name` | nome AWS del gruppo | `AWSManagedRulesAmazonIpReputationList`, `AWSManagedRulesCommonRuleSet`, `AWSManagedRulesKnownBadInputsRuleSet`, opzionali `AWSManagedRulesSQLiRuleSet`, `AWSManagedRulesAnonymousIpList`, `AWSManagedRulesAdminProtectionRuleSet`, `AWSManagedRulesLinuxRuleSet`, `AWSManagedRulesUnixRuleSet`, `AWSManagedRulesWindowsRuleSet`, `AWSManagedRulesPHPRuleSet`, `AWSManagedRulesWordPressRuleSet` (vedi `docs/rules-spec.md` §5b) |
+| `enabled` | bool | i gruppi opzionali partono disabilitati; `false` disattiva un gruppo abilitato da un profilo padre |
 | `override_action` | `none` \| `count` | `count` = tutto il gruppo in Count (come AWS) |
 | `rule_action_overrides` | mappa `Regola: block\|count\|allow` | override per regola (come AWS `RuleActionOverrides`) |
 | `scope_down` | match | il gruppo valuta solo le richieste che soddisfano il match |
@@ -136,3 +136,27 @@ path_overrides:
 | `aws-default` | la web ACL one-click: IpReputation → CommonRuleSet → KnownBadInputs, azioni default AWS |
 | `shadow` | `aws-default` con `mode: count` (primo deploy) |
 | `strict` | `aws-default` + SQLi + AnonymousIp |
+| `web-common` | qualunque sito su Linux: `aws-default` + SQLi + Linux + Unix; blocca file riservati (`.env`, `.git`, chiavi, backup, `composer.json`, `docker-compose.yml`), percorsi cercati dagli scanner (phpunit, actuator, `_ignition`, `cgi-bin`, router/VPN), metodi TRACE/TRACK/DEBUG/CONNECT |
+| `php` | `web-common` + PHP; blocca webshell/`phpinfo.php` e phpMyAdmin/Adminer (Laravel, Symfony, Drupal, Joomla, PrestaShop, Magento) |
+| `wordpress` | `php` + WordPress; regole sul body in Count negli endpoint dell'editor (`wp-admin/post.php`, `/wp-json/wp/v2/`…) e Block altrove (regole `WordPress*OutsideEditor`); blocca enumerazione utenti e file di versione. Con `app: wordpress` |
+| `static` | `web-common`; solo GET/HEAD/OPTIONS, nessuno script lato server (`.php`, `.asp`, `.jsp`…) |
+| `api` | `web-common`; NoUserAgent e SizeRestrictions_BODY in Count (client non-browser, JSON grandi) |
+| `aspnet` | `web-common` con Windows al posto di Linux/Unix; SizeRestrictions_BODY in Count (ViewState) |
+| `odoo-common`, `odoo-12/14/16/18` | Odoo (vedi `docs/odoo.md`) |
+
+Ogni regola di un profilo si regola nel file del sito: `disable_custom_rules: [BlockDbAdminTools]`,
+una custom rule con lo stesso nome (es. `action: count`) la sostituisce, `rule_groups[].enabled: false`
+spegne un gruppo, `rule_action_overrides` cambia l'azione di una singola regola AWS. Esempio:
+
+```yaml
+# sites/blog.yaml
+site_id: blog
+server_names: [blog.example.com]
+app: wordpress
+upstream: {servers: ["wordpress:80"]}
+profile: wordpress
+rule_groups:
+  - name: AWSManagedRulesWordPressRuleSet
+    rule_action_overrides: {WordPressExploitablePaths_URIPATH: count}   # xmlrpc.php serve a Jetpack
+disable_custom_rules: [WordPressBlockFingerprintFiles]
+```

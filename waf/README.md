@@ -22,13 +22,14 @@ Campi per regola:
 | ID | Uso |
 |---|---|
 | 11000xx / 14500xx / 12000xx / 13000xx / 14000xx | gruppi iprep / anonip / crs / kbi / sqli |
+| 14100xx / 14200xx / 14300xx / 14400xx / 14600xx / 14700xx | gruppi opzionali admin / linux / unix / windows / php / wordpress |
 | `B+0..B+6` | detector della regola |
 | `B+7` | regola label (setta la label se un detector ha fatto match) |
 | `B+8` | candidato terminante (azione effettiva) |
 | `B+9` | esito AWS-default (solo regole non opzionali con default block) |
 | `1G00001` | skip del gruppo (`SecMarker END_GRP_<KEY>`) |
 | `1500000 + siteIdx*1000 + ruleIdx*10` | custom rule |
-| `1600000 + siteIdx*100 + groupIdx*10` | scope-down |
+| `1600000 + siteIdx*1000 + groupIdx*10` | scope-down |
 | `1700000 + siteIdx*100 + i` | path override |
 | 1900001–1900099 | engine |
 | `1910000 + siteIdx*10 + k` | variabili di sito |

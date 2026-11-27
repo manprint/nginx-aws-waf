@@ -1,0 +1,10 @@
+version: 1
+name: aspnet
+description: "ASP.NET / IIS on Windows: web-common with the Windows group (cmd/PowerShell injection) instead of Linux/POSIX; large WebForms bodies (ViewState) counted (aws-compatible)."
+extends: web-common
+rule_groups:
+  - {name: AWSManagedRulesLinuxRuleSet, enabled: false}
+  - {name: AWSManagedRulesUnixRuleSet, enabled: false}
+  - {name: AWSManagedRulesWindowsRuleSet, enabled: true}   # cmd.exe, PowerShell (Invoke-Expression, DownloadString...)
+  - name: AWSManagedRulesCommonRuleSet
+    rule_action_overrides: {SizeRestrictions_BODY: count}  # __VIEWSTATE spesso > 8 KB

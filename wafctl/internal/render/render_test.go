@@ -81,7 +81,7 @@ func TestR1_ReferenceOracle(t *testing.T) {
 		t.Skip("SKIP: PyYAML missing")
 	}
 	abs, _ := filepath.Abs(catPath)
-	cmd := exec.Command("python3", "../../../docs/plans/001_plan-nginx-aws-waf/snippets/reference-render.py", "anonip", "sqli")
+	cmd := exec.Command("python3", "../../../docs/plans/001_plan-nginx-aws-waf/snippets/reference-render.py", "anonip", "sqli", "admin", "linux", "unix", "windows", "php", "wordpress")
 	cmd.Env = append(os.Environ(), "WAF_CATALOG="+abs)
 	ref, err := cmd.Output()
 	if err != nil {
@@ -156,15 +156,15 @@ func TestR3_Counts(t *testing.T) {
 			}
 		}
 	}
-	if want9 != 36 || want7 != 47 {
+	if want9 != 36 || want7 != 71 {
 		t.Errorf("catalog recount: B+9=%d B+7=%d", want9, want7)
 	}
 	n9 := len(regexp.MustCompile(`(?m)"id:1[0-4][0-9]{4}9,phase:2`).FindAllString(s, -1))
 	n7 := len(regexp.MustCompile(`(?m)"id:1[0-4][0-9]{4}7,phase:2`).FindAllString(s, -1))
-	if n9 != 36 || n7 != 47 {
-		t.Errorf("rendered B+9=%d B+7=%d, want 36/47", n9, n7)
+	if n9 != 36 || n7 != 71 {
+		t.Errorf("rendered B+9=%d B+7=%d, want 36/71", n9, n7)
 	}
-	if n := strings.Count(s, "stub, no detector"); n != 8 {
+	if n := strings.Count(s, "stub, no detector"); n != 9 {
 		t.Errorf("stubs = %d", n)
 	}
 	if regexp.MustCompile(`(?m)^\s+SecRule`).MatchString(s) {

@@ -14,8 +14,8 @@ func TestCAT1_CatalogShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.Groups) != 5 {
-		t.Fatalf("groups = %d, want 5", len(c.Groups))
+	if len(c.Groups) != 11 {
+		t.Fatalf("groups = %d, want 11", len(c.Groups))
 	}
 	var all, nonopt []string
 	for _, g := range c.Groups {
@@ -24,13 +24,14 @@ func TestCAT1_CatalogShape(t *testing.T) {
 			nonopt = append(nonopt, g.Key)
 		}
 	}
-	if got := strings.Join(all, ","); got != "iprep,anonip,crs,kbi,sqli" {
+	if got := strings.Join(all, ","); got != "iprep,anonip,crs,kbi,sqli,admin,linux,unix,windows,php,wordpress" {
 		t.Errorf("order = %s", got)
 	}
 	if got := strings.Join(nonopt, ","); got != "iprep,crs,kbi" {
 		t.Errorf("non-optional = %s", got)
 	}
-	want := map[string]int{"iprep": 3, "anonip": 2, "crs": 22, "kbi": 20, "sqli": 8}
+	want := map[string]int{"iprep": 3, "anonip": 2, "crs": 22, "kbi": 20, "sqli": 8,
+		"admin": 1, "linux": 3, "unix": 3, "windows": 8, "php": 8, "wordpress": 2}
 	total := 0
 	for _, g := range c.Groups {
 		if len(g.Rules) != want[g.Key] {
@@ -38,8 +39,8 @@ func TestCAT1_CatalogShape(t *testing.T) {
 		}
 		total += len(g.Rules)
 	}
-	if total != 55 {
-		t.Errorf("total = %d, want 55", total)
+	if total != 80 {
+		t.Errorf("total = %d, want 80", total)
 	}
 	if r := c.RuleByName("AWSManagedRulesCommonRuleSet", "NoUserAgent_HEADER"); r == nil || r.ID != 1200010 {
 		t.Errorf("NoUserAgent_HEADER = %+v", r)

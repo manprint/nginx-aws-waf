@@ -1,0 +1,16 @@
+version: 1
+name: static
+description: "Static site or SPA (HTML/JS/CSS, Hugo, Jekyll, React/Vue build): web-common + no server-side scripts and only GET/HEAD/OPTIONS (aws-compatible)."
+extends: web-common
+# Se la SPA chiama API sullo stesso dominio con POST/PUT:   disable_custom_rules: [BlockWriteMethods]
+custom_rules:
+  # Un sito statico non ha script lato server: ogni .php/.asp/.jsp/.cgi è una sonda
+  - name: BlockServerSideScripts
+    slot: start
+    action: block
+    match: {all: [{uri_path: {regex: '\.(?:php\d?|phtml|phar|asp|aspx|ashx|asmx|axd|jsp|jspx|do|action|cgi|pl|py|rb|cfm|shtml)$', transform: [urlDecodeUni, lowercase]}}]}
+  # Solo lettura: niente POST/PUT/PATCH/DELETE
+  - name: BlockWriteMethods
+    slot: start
+    action: block
+    match: {all: [{method: [GET, HEAD, OPTIONS], negate: true}]}

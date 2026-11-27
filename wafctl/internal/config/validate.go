@@ -134,8 +134,8 @@ func Validate(cfg *Config, cat *catalog.Catalog) []Issue {
 			}
 			names[sn] = s.SiteID
 		}
-		if !in(s.App, "odoo", "generic") {
-			v.err("app", "app %q not in {odoo,generic}", s.App)
+		if !in(s.App, "odoo", "wordpress", "generic") {
+			v.err("app", "app %q not in {odoo,wordpress,generic}", s.App)
 		}
 		if len(s.Upstream.Servers) == 0 {
 			v.err("upstream.servers", "upstream.servers must not be empty")
@@ -250,7 +250,7 @@ func validateWAF(v *vctx, cfg *Config, cat *catalog.Catalog, w *WAF) {
 		}
 		if g.Enabled != nil && *g.Enabled {
 			enabled[g.Name] = true
-		} else if cg.Optional {
+		} else if cg.Optional && g.Enabled == nil {
 			v.warn(p+".enabled", "optional group %s is listed without enabled: true; it stays disabled", g.Name)
 		}
 		if !in(g.OverrideAction, "none", "count") {

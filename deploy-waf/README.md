@@ -212,7 +212,8 @@ Le opzioni sono tutte in `.env.example`, ciascuna con un commento. Dopo una modi
 | `WAF_UPSTREAM_TLS` | `true` | HTTPS verso nginx |
 | `WAF_TLS_MODE` | `redirect` | `off` / `on` / `redirect` (HTTP → HTTPS) |
 | `WAF_DEFAULT_SITE` | `app` | gli Host non elencati vanno comunque a nginx (vuoto = connessione chiusa) |
-| `WAF_PROFILE` | `aws-default` | `aws-default`, `shadow` (solo log), `strict` (+SQLi, Tor), `odoo-NN` |
+| `WAF_PROFILE` | `aws-default` | `aws-default`, `shadow` (solo log), `strict` (+SQLi, Tor), `web-common`, `php`, `wordpress`, `static`, `api`, `aspnet`, `odoo-NN` (vedi sotto) |
+| `WAF_APP` | `generic` | `generic`, `wordpress`, `odoo`: classifica le richieste nelle dashboard (backend, api, static, website) |
 | `WAF_MODE` | (del profilo) | `enforce` = blocca, `count` = registra soltanto |
 | `WAF_BODY_LIMIT` | `8192` | byte del body ispezionati (come AWS) |
 | `WAF_MAX_BODY_SIZE` | `10m` | upload massimo |
@@ -238,7 +239,24 @@ i file YAML in `config/sites/`: vedi `config/examples/site-full.yaml` e `../docs
 | `AWSManagedRulesCommonRuleSet` | XSS, LFI/path traversal, RFI, SSRF verso EC2 metadata, richieste senza User-Agent, body/query/cookie troppo grandi, estensioni riservate |
 | `AWSManagedRulesKnownBadInputsRuleSet` | Log4Shell, Java deserialization, percorsi sfruttabili, `localhost` nell'Host, ecc. |
 
-**SQL injection non è nel default AWS.** Se ti serve, usa `WAF_PROFILE=strict`.
+**SQL injection non è nel default AWS.** Se ti serve, usa `WAF_PROFILE=strict` o uno dei profili per tipo di sito.
+
+### Profili per tipo di sito
+
+Aggiungono al default AWS i gruppi AWS "per caso d'uso" (SQLi, Linux, Unix, Windows, PHP, WordPress)
+e regole contro le sonde più comuni dei bot. Ogni regola si può spegnere o mettere in count dal file
+del sito (`../docs/config-reference.md`, sezione "Profili di prodotto").
+
+| `WAF_PROFILE` | Per | In più rispetto a `aws-default` |
+|---|---|---|
+| `web-common` | qualunque sito su Linux (Node, Python, Ruby, Go, Java...) | SQL injection, file di sistema Linux, command injection; blocca `.env`, `.git`, chiavi, backup, `composer.json`, sonde di scanner (phpunit, actuator, cgi-bin), TRACE/DEBUG |
+| `php` | Laravel, Symfony, Drupal, Joomla, PrestaShop, Magento, PHP custom | `web-common` + iniezione di codice PHP, PHP-CGI; blocca webshell, `phpinfo.php`, phpMyAdmin/Adminer |
+| `wordpress` | WordPress (con `WAF_APP=wordpress`) | `php` + `xmlrpc.php`, `wp-config.php*`, PHP negli upload, plugin vulnerabili, enumerazione utenti, `readme.html`; l'editor (Gutenberg/classico) può salvare HTML e codice |
+| `static` | sito statico / SPA | `web-common` + solo GET/HEAD/OPTIONS, nessuno script `.php/.asp/.jsp` |
+| `api` | API REST/JSON | `web-common` con User-Agent mancante e body grandi solo registrati |
+| `aspnet` | ASP.NET / IIS | `web-common` con command injection Windows/PowerShell al posto di Linux/Unix |
+
+Consiglio: inizia con `WAF_MODE=count` e guarda le dashboard prima di bloccare (sezione 7).
 
 ## 7. Messa in produzione: prima osserva, poi blocca
 

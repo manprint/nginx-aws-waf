@@ -1,0 +1,87 @@
+version: 1
+name: wordpress
+description: "WordPress: php + AWS WordPress group; body rules counted in the authenticated editor/REST endpoints and blocked everywhere else; user enumeration and fingerprinting blocked (aws-compatible)."
+extends: php
+# Nel file del sito metti anche  app: wordpress  (classifica le richieste in Grafana: backend, api, static, website).
+#
+# xmlrpc.php è bloccato (regola AWS WordPressExploitablePaths_URIPATH). Se serve (Jetpack, app mobile WordPress):
+#   rule_groups:
+#     - name: AWSManagedRulesWordPressRuleSet
+#       rule_action_overrides: {WordPressExploitablePaths_URIPATH: count}
+# Login e wp-admin raggiungibili solo da IP fidati (consigliato):
+#   custom_rules:
+#     - name: WordPressAdminOnlyFromOffice
+#       slot: start
+#       action: block
+#       match: {all: [{uri_path: {regex: '^/(wp-login\.php|wp-admin/)'}},
+#                     {uri_path: {exact: /wp-admin/admin-ajax.php}, negate: true},
+#                     {ip_set: [203.0.113.10/32], negate: true}]}
+# Limite di richieste per IP (tutto il sito, nginx-only): rate_limit: {limit: 600, window_sec: 60, action: block}
+# Page builder che salvano da admin-ajax.php (Elementor, Divi...): nel sito ridefinire le regole
+# WordPress*OutsideEditor che bloccano (stesso nome) aggiungendo admin-ajax.php alla regex dell'editor,
+# oppure, per prova, metterle in count:  ridefinirle con action: count.
+# (path_overrides non basta: le regole WordPress*OutsideEditor si basano sulle label, che restano anche in count.)
+rule_groups:
+  - {name: AWSManagedRulesWordPressRuleSet, enabled: true}  # xmlrpc.php, wp-config.php*, PHP in uploads, comandi di plugin vulnerabili
+  # Regole sul body in count: scritte nei post/pagine dell'editor sono normali (HTML, codice, link, SQL negli articoli).
+  # Le regole WordPress*OutsideEditor qui sotto le bloccano comunque fuori dagli endpoint dell'editor.
+  - name: AWSManagedRulesCommonRuleSet
+    rule_action_overrides: {SizeRestrictions_BODY: count, CrossSiteScripting_BODY: count, GenericRFI_BODY: count, GenericLFI_BODY: count}
+  - name: AWSManagedRulesSQLiRuleSet
+    rule_action_overrides: {SQLi_BODY: count, SQLiExtendedPatterns_BODY: count}
+  - name: AWSManagedRulesUnixRuleSet
+    rule_action_overrides: {UNIXShellCommandsVariables_BODY: count}
+  - name: AWSManagedRulesPHPRuleSet
+    rule_action_overrides: {PHPHighRiskMethodsVariables_BODY: count}
+custom_rules:
+  # Endpoint dell'editor (WordPress li accetta solo da utenti autenticati): ^/(?:wp-admin/(?:post|post-new|async-upload|media-new|media-upload|theme-editor|plugin-editor|customize|options|options-general|nav-menus|widgets|site-editor|edit-tags|term|comment|profile|user-edit)\.php|wp-json/(?:wp/v2|wp-block-editor/v1|wc/v[1-3]|wc-admin)/)
+  - name: WordPressBodySizeOutsideEditor
+    slot: after:AWSManagedRulesCommonRuleSet
+    action: block
+    match: {all: [{label: "awswaf:managed:aws:core-rule-set:SizeRestrictions_Body"}, {uri_path: {regex: '^/(?:wp-admin/(?:post|post-new|async-upload|media-new|media-upload|theme-editor|plugin-editor|customize|options|options-general|nav-menus|widgets|site-editor|edit-tags|term|comment|profile|user-edit)\.php|wp-json/(?:wp/v2|wp-block-editor/v1|wc/v[1-3]|wc-admin)/)'}, negate: true}]}
+  - name: WordPressXssBodyOutsideEditor
+    slot: after:AWSManagedRulesCommonRuleSet
+    action: block
+    match: {all: [{label: "awswaf:managed:aws:core-rule-set:CrossSiteScripting_Body"}, {uri_path: {regex: '^/(?:wp-admin/(?:post|post-new|async-upload|media-new|media-upload|theme-editor|plugin-editor|customize|options|options-general|nav-menus|widgets|site-editor|edit-tags|term|comment|profile|user-edit)\.php|wp-json/(?:wp/v2|wp-block-editor/v1|wc/v[1-3]|wc-admin)/)'}, negate: true}]}
+  - name: WordPressRfiBodyOutsideEditor
+    slot: after:AWSManagedRulesCommonRuleSet
+    action: block
+    match: {all: [{label: "awswaf:managed:aws:core-rule-set:GenericRFI_Body"}, {uri_path: {regex: '^/(?:wp-admin/(?:post|post-new|async-upload|media-new|media-upload|theme-editor|plugin-editor|customize|options|options-general|nav-menus|widgets|site-editor|edit-tags|term|comment|profile|user-edit)\.php|wp-json/(?:wp/v2|wp-block-editor/v1|wc/v[1-3]|wc-admin)/)'}, negate: true}]}
+  - name: WordPressLfiBodyOutsideEditor
+    slot: after:AWSManagedRulesCommonRuleSet
+    action: block
+    match: {all: [{label: "awswaf:managed:aws:core-rule-set:GenericLFI_Body"}, {uri_path: {regex: '^/(?:wp-admin/(?:post|post-new|async-upload|media-new|media-upload|theme-editor|plugin-editor|customize|options|options-general|nav-menus|widgets|site-editor|edit-tags|term|comment|profile|user-edit)\.php|wp-json/(?:wp/v2|wp-block-editor/v1|wc/v[1-3]|wc-admin)/)'}, negate: true}]}
+  - name: WordPressSqliBodyOutsideEditor
+    slot: after:AWSManagedRulesSQLiRuleSet
+    action: block
+    match: {all: [{label: "awswaf:managed:aws:sql-database:SQLi_Body"}, {uri_path: {regex: '^/(?:wp-admin/(?:post|post-new|async-upload|media-new|media-upload|theme-editor|plugin-editor|customize|options|options-general|nav-menus|widgets|site-editor|edit-tags|term|comment|profile|user-edit)\.php|wp-json/(?:wp/v2|wp-block-editor/v1|wc/v[1-3]|wc-admin)/)'}, negate: true}]}
+  - name: WordPressSqliExtBodyOutsideEditor
+    slot: after:AWSManagedRulesSQLiRuleSet
+    action: block
+    match: {all: [{label: "awswaf:managed:aws:sql-database:SQLiExtendedPatterns_Body"}, {uri_path: {regex: '^/(?:wp-admin/(?:post|post-new|async-upload|media-new|media-upload|theme-editor|plugin-editor|customize|options|options-general|nav-menus|widgets|site-editor|edit-tags|term|comment|profile|user-edit)\.php|wp-json/(?:wp/v2|wp-block-editor/v1|wc/v[1-3]|wc-admin)/)'}, negate: true}]}
+  - name: WordPressShellBodyOutsideEditor
+    slot: after:AWSManagedRulesUnixRuleSet
+    action: block
+    match: {all: [{label: "awswaf:managed:aws:posix-os:UNIXShellCommandsVariables_Body"}, {uri_path: {regex: '^/(?:wp-admin/(?:post|post-new|async-upload|media-new|media-upload|theme-editor|plugin-editor|customize|options|options-general|nav-menus|widgets|site-editor|edit-tags|term|comment|profile|user-edit)\.php|wp-json/(?:wp/v2|wp-block-editor/v1|wc/v[1-3]|wc-admin)/)'}, negate: true}]}
+  - name: WordPressPhpBodyOutsideEditor
+    slot: after:AWSManagedRulesPHPRuleSet
+    action: block
+    match: {all: [{label: "awswaf:managed:aws:php-app:PHPHighRiskMethodsVariables_Body"}, {uri_path: {regex: '^/(?:wp-admin/(?:post|post-new|async-upload|media-new|media-upload|theme-editor|plugin-editor|customize|options|options-general|nav-menus|widgets|site-editor|edit-tags|term|comment|profile|user-edit)\.php|wp-json/(?:wp/v2|wp-block-editor/v1|wc/v[1-3]|wc-admin)/)'}, negate: true}]}
+  # Enumerazione degli utenti (/?author=1, /wp-json/wp/v2/users, ?rest_route=/wp/v2/users) per chi non è loggato
+  - name: WordPressBlockUserEnumQuery
+    slot: start
+    action: block
+    match: {all: [{query_arg: {name: author, regex: '^[0-9]+$'}}, {header: {name: Cookie, contains: wordpress_logged_in_}, negate: true}]}
+  - name: WordPressBlockUserEnumRest
+    slot: start
+    action: block
+    match: {all: [{uri_path: {regex: '^/wp-json/wp/v2/users', transform: [urlDecodeUni, lowercase]}}, {header: {name: Cookie, contains: wordpress_logged_in_}, negate: true}]}
+  - name: WordPressBlockUserEnumRestRoute
+    slot: start
+    action: block
+    match: {all: [{query_arg: {name: rest_route, regex: '^/wp/v2/users', transform: [urlDecodeUni, lowercase]}}, {header: {name: Cookie, contains: wordpress_logged_in_}, negate: true}]}
+  # File che rivelano la versione di WordPress, temi e plugin (readme.html, license.txt, readme.txt dei plugin)
+  - name: WordPressBlockFingerprintFiles
+    slot: start
+    action: block
+    match: {all: [{uri_path: {regex: '^/(?:readme\.html|license\.txt|wp-admin/(?:readme|license)\.(?:html|txt))$|^/wp-content/(?:plugins|themes)/[^/]+/(?:readme|changelog|license)\.(?:txt|md|html)$', transform: [urlDecodeUni, lowercase]}}]}

@@ -47,10 +47,16 @@ Mappa definitiva (D23, piano 001). `siteIdx` = indice del sito nella lista ordin
 | 1200000–1200099 | AWSManagedRulesCommonRuleSet (`crs`) |
 | 1300000–1300099 | AWSManagedRulesKnownBadInputsRuleSet (`kbi`) |
 | 1400000–1400099 | AWSManagedRulesSQLiRuleSet (`sqli`, opzionale) |
+| 1410000–1410099 | AWSManagedRulesAdminProtectionRuleSet (`admin`, opzionale) |
+| 1420000–1420099 | AWSManagedRulesLinuxRuleSet (`linux`, opzionale) |
+| 1430000–1430099 | AWSManagedRulesUnixRuleSet (`unix`, opzionale) |
+| 1440000–1440099 | AWSManagedRulesWindowsRuleSet (`windows`, opzionale) |
+| 1460000–1460099 | AWSManagedRulesPHPRuleSet (`php`, opzionale) |
+| 1470000–1470099 | AWSManagedRulesWordPressRuleSet (`wordpress`, opzionale) |
 | per regola B | B+0..6 detector, B+7 label, B+8 terminazione, B+9 azione default AWS |
 | 1G00001 | salto del gruppo G (`SecMarker END_GRP_<key>`) |
 | 1500000 + siteIdx·1000 + ruleIdx·10 | custom rule del sito |
-| 1600000 + siteIdx·100 + groupIdx·10 (+0, +1) | scope-down per gruppo |
+| 1600000 + siteIdx·1000 + groupIdx·10 (+0, +1) | scope-down per gruppo (fino a 100 gruppi) |
 | 1700000 + siteIdx·100 + i | path override (nginx-only) |
 | 1900001–1900099 | motore (init, `TX:raw_path`, …) |
 | 1910000 + siteIdx·10 + k | variabili del sito |
@@ -158,6 +164,26 @@ Label prefix: `awswaf:managed:aws:known-bad-inputs:`
 | 1300200 | Ruby2Shell_MULTIPARTMETHOD | **Count** | idem | ⚠ stub |
 
 Le regole Count non cambiano l'esito (solo label/log): gli stub non alterano il comportamento Allow/Block.
+
+## 5b. Gruppi opzionali per caso d'uso (AWS "use-case" e "OS" rule group)
+
+Tutti opzionali (`enabled: true` nel sito o nel profilo). I pattern AWS non sono pubblici: i detector
+sono ricostruzioni (fidelity `approx`) dai nomi e dalle descrizioni della documentazione
+(`docs/aws/managed-rules-use-case.md`), tarate per non bloccare il traffico normale. Trasformazioni:
+`utf8toUnicode, urlDecodeUni, removeNulls, lowercase` (+ `normalizePath` sui path).
+
+| Gruppo (WCU) | Label prefix | Regole (ID) | Rileva |
+|---|---|---|---|
+| AdminProtection (100) | `admin-protection:` | AdminProtection_URIPATH (1410010) | pagine di amministrazione note: `/admin`, `/wp-admin`, phpMyAdmin, Adminer, Tomcat manager, JBoss/JMX, actuator, `server-status` |
+| Linux (200) | `linux-os:` | LFI_URIPATH, LFI_QUERYSTRING, LFI_HEADER (1420010–30) | percorsi di file di sistema Linux (`waf/data/linux-lfi.data`: `/etc/passwd`, `/proc/self/`, `.ssh/id_`, `.aws/credentials`…) |
+| Unix/POSIX (100) | `posix-os:` | UNIXShellCommandsVariables_QUERYSTRING, _BODY, _HEADER (1430010–30) | command injection: `;id`, `\|whoami`, `$(curl …)`, `` `id` ``, `wget/curl http://`, `nc host port`, `sh -c '…'`, `/bin/sh`, `${IFS}` |
+| Windows (200) | `windows-os:` | WindowsShellCommands_HEADER, _QUERYARGUMENTS, _QUERYSTRING, _URIPATH, _BODY; PowerShellCommands_COOKIE, _QUERYARGUMENTS, _BODY (1440010–80) | `cmd /c`, `net user`, `certutil -urlcache`, `c:\windows\system32\`, `%COMSPEC%`; PowerShell `Invoke-Expression`, `IEX(`, `DownloadString(`, `-enc <base64>` |
+| PHP (100) | `php-app:` | PHPHighRiskMethodsVariables_HEADER, _QUERYSTRING, _BODY, _URIPATH; PHP2Shell_BODY, PHP2Shell_BODY_Extended; **Count**: PHPUploadProgressSerializedObject_BODY, PHPFPMSmuggling_BODY (1460010–80) | `$_GET`/`$_POST`…, `system(`/`eval(`/`base64_decode(` con argomento, wrapper `php://` `phar://` `data:`, `<?php`, ThinkPHP `invokefunction`; PHP-CGI `-d allow_url_include=`; oggetti serializzati in `PHP_SESSION_UPLOAD_PROGRESS`. PHPFPMSmuggling_BODY è uno stub |
+| WordPress (100) | `wordpress-app:` | WordPressExploitableCommands_QUERYSTRING, WordPressExploitablePaths_URIPATH (1470010–20) | `xmlrpc.php`, `wp-config.php*`, `wp-admin/install.php`, `setup-config.php`, PHP in `wp-content/uploads`, `debug.log`, `wlwmanifest.xml`, comandi di plugin vulnerabili (`do-reset-wordpress`, `revslider_show_image`, wp-file-manager) |
+
+Ordine di valutazione (priorità): iprep → anonip → crs → kbi → sqli → admin → linux → unix → windows → php → wordpress.
+WCU: AWS consente fino a 1500 WCU per web ACL senza costi aggiuntivi (max 5000): il profilo `wordpress`
+(~1650 WCU con le custom rule) supera la soglia gratuita se esportato su AWS.
 
 ## 6. Avvertenze per i test
 

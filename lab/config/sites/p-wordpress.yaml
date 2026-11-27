@@ -1,0 +1,7 @@
+version: 1
+site_id: p-wordpress
+server_names: [wordpress.lab.test]
+app: wordpress
+upstream: {servers: ["echo:8081"]}
+client_ip: {source: xff, trusted_proxies: ["0.0.0.0/0", "::/0"]}
+profile: wordpress

