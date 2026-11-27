@@ -1,0 +1,17 @@
+# Sito Odoo 14 nel WAF: regole AWS one-click + eccezioni per Odoo (profilo odoo-14).
+version: 1
+site_id: odoo
+server_names: [odoo.localhost, localhost, 127.0.0.1]
+app: odoo                       # aggiunge la location realtime e la classificazione delle richieste Odoo
+profile: odoo-14                # aws-default + RPC/editor di Odoo (body grandi, HTML) in count
+upstream:
+  servers: ["nginx:80"]
+  realtime: {path: /longpolling, servers: ["nginx:80"]}   # Odoo 14: longpolling (timeout lungo)
+  max_body_size: 100m           # allegati
+  read_timeout_sec: 720
+# Solo in locale: la regola AWS Host_localhost_HEADER blocca "Host: localhost" (in produzione non
+# serve, nessun utente vero usa localhost). Qui la mettiamo in count così http://localhost funziona.
+rule_groups:
+  - name: AWSManagedRulesKnownBadInputsRuleSet
+    rule_action_overrides: {Host_localhost_HEADER: count}
+# mode: count                   # decommenta per osservare senza bloccare

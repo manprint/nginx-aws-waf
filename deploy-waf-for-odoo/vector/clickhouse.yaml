@@ -1,0 +1,39 @@
+# Log del WAF → ClickHouse (database waf, schema in clickhouse/initdb/001-schema.sql).
+#   waf.events      una riga per richiesta (esito, regola che termina, label, header, body, latenze)
+#   waf.matches     una riga per regola matchata (anche le regole in count)
+#   waf.heartbeats  ogni 30 s: nodo, versione e revisione di config attiva
+# Gli input matches_out e hb_parse sono definiti in node.yaml; events_geo in geoip-on/off.yaml.
+
+sinks:
+  ch_events:
+    type: clickhouse
+    inputs: [events_geo]          # geoip-on.yaml o geoip-off.yaml
+    endpoint: http://clickhouse:8123
+    database: waf
+    table: events
+    skip_unknown_fields: true
+    date_time_best_effort: true
+    auth: {strategy: basic, user: waf_ingest, password: "${WAF_CH_INGEST_PASSWORD}"}
+    batch: {timeout_secs: 2}
+    buffer: {type: disk, max_size: 1073741824, when_full: block}   # ClickHouse giù: gli eventi aspettano su disco
+  ch_matches:
+    type: clickhouse
+    inputs: [matches_out]
+    endpoint: http://clickhouse:8123
+    database: waf
+    table: matches
+    skip_unknown_fields: true
+    date_time_best_effort: true
+    auth: {strategy: basic, user: waf_ingest, password: "${WAF_CH_INGEST_PASSWORD}"}
+    batch: {timeout_secs: 2}
+    buffer: {type: disk, max_size: 1073741824, when_full: block}
+  ch_heartbeats:
+    type: clickhouse
+    inputs: [hb_parse]
+    endpoint: http://clickhouse:8123
+    database: waf
+    table: heartbeats
+    skip_unknown_fields: true
+    date_time_best_effort: true
+    auth: {strategy: basic, user: waf_ingest, password: "${WAF_CH_INGEST_PASSWORD}"}
+    batch: {timeout_secs: 2}

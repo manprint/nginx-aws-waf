@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Entrypoint del container aio: render iniziale della config, loop di manutenzione in background, poi nginx.
+set -euo pipefail
+
+# comandi diversi da nginx (es. `docker compose run --rm waf waf validate`) passano dritti
+if [[ ${1:-} != nginx ]]; then exec "$@"; fi
+
+waf _init
+
+every() { # secondi comando...
+	local s="$1"
+	shift
+	((s > 0)) || return 0
+	(
+		while sleep "$s"; do "$@" || true; done
+	) &
+}
+
+# hot reload: ricostruisce la config da /config e dalle variabili; reload solo se cambia (scadenza bypass compresa)
+every "${WAF_WATCH_INTERVAL:-30}" waf reload
+# rotazione log
+every "${WAF_ROTATE_INTERVAL:-300}" waf rotate
+# liste IP di reputazione (serve uscita internet verso i feed)
+lu="${WAF_LISTS_UPDATE:-false}"
+case "${lu,,}" in
+1 | true | yes | on)
+	[[ ${WAF_LISTS_UPDATE_ON_START:-false} == true ]] && (waf lists-update || true) &
+	every $((${WAF_LISTS_UPDATE_HOURS:-24} * 3600)) waf lists-update
+	;;
+esac
+
+exec "$@"

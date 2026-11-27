@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+# waf — gestione del WAF dentro il container aio (sostituisce `wafctl apply`, che richiede docker sull'host).
+#
+#   waf config        ricostruisce $WAF_CONFIG_DIR da /config e dalle variabili WAF_* (stampa node.yaml e siti)
+#   waf validate      valida la configurazione (wafctl validate)
+#   waf reload [-f]   render + nginx -t + switch atomico di runtime/current + reload (no-op se identica)
+#   waf rollback REV  torna a una rev precedente (ls /etc/waf/runtime)
+#   waf explain SITE  come è configurato un sito (wafctl explain)
+#   waf bypass ...    wafctl bypass <site> --ttl 30m --reason "..." | list | clear <site>, poi reload
+#   waf lists-update  scarica le liste IP (protezione 50 %), reload se cambiate
+#   waf rotate        ruota access/error/audit log, pulisce log e raw vecchi
+#   waf status        rev attiva, siti, stato nginx
+#   waf wafctl ...    qualsiasi comando wafctl con l'ambiente del container
+set -euo pipefail
+
+CFG="${WAF_CONFIG_DIR:-/var/lib/waf/config}"
+RT=/etc/waf/runtime
+SRC=/config
+STATE=/srv/waf/state
+PID=/tmp/nginx.pid
+LOCK=/tmp/waf.lock
+
+log() { echo "waf: $*" >&2; }
+die() { log "$*"; exit 1; }
+is_true() { case "${1,,}" in 1 | true | yes | on) return 0 ;; *) return 1 ;; esac; }
+nginx_running() { [[ -s $PID ]] && kill -0 "$(cat "$PID")" 2>/dev/null; }
+
+# "a, b,c" → ["a", "b", "c"] (flow sequence YAML con stringhe quotate)
+yaml_list() {
+	local out="" it
+	IFS=',' read -ra items <<<"$1"
+	for it in "${items[@]}"; do
+		it="${it#"${it%%[![:space:]]*}"}"
+		it="${it%"${it##*[![:space:]]}"}"
+		[[ -n $it ]] && out+="${out:+, }\"${it}\""
+	done
+	echo "[$out]"
+}
+
+gen_node() {
+	local net="${WAF_NETWORK:-bridge}" http https
+	if [[ $net == host ]]; then http="${WAF_HTTP_LISTEN:-80}" https="${WAF_HTTPS_LISTEN:-443}"; else http="${WAF_HTTP_LISTEN:-8080}" https="${WAF_HTTPS_LISTEN:-8443}"; fi
+	cat <<EOF
+# generato da waf config (variabili WAF_*); per usarne uno proprio monta /config/node.yaml
+version: 1
+node_id: "${WAF_NODE_ID:-$(hostname)}"
+role: node
+network: ${net}
+listen: {http: ${http}, https: ${https}, ipv6: ${WAF_IPV6:-false}}
+workers: ${WAF_WORKERS:-0}
+geoip: {enabled: ${WAF_GEOIP:-false}}
+audit: {scope: ${WAF_AUDIT_SCOPE:-all}}
+EOF
+	[[ -n ${WAF_DEFAULT_SITE:-} ]] && echo "default_site: ${WAF_DEFAULT_SITE}"
+	[[ -n ${WAF_CENTRAL_ADDRESS:-} ]] && echo "central: {address: \"${WAF_CENTRAL_ADDRESS}\", ingest_port: ${WAF_CENTRAL_INGEST_PORT:-6000}, pki_port: ${WAF_CENTRAL_PKI_PORT:-6001}}"
+	return 0
+}
+
+gen_site() {
+	local id="${WAF_SITE_ID:-app}"
+	cat <<EOF
+# generato da waf config (variabili WAF_SITE_* / WAF_UPSTREAM*)
+version: 1
+site_id: ${id}
+server_names: $(yaml_list "${WAF_SERVER_NAMES:-localhost}")
+app: ${WAF_APP:-generic}
+profile: ${WAF_PROFILE:-aws-default}
+upstream:
+  servers: $(yaml_list "$WAF_UPSTREAM")
+  tls: ${WAF_UPSTREAM_TLS:-false}
+  max_body_size: ${WAF_MAX_BODY_SIZE:-10m}
+  read_timeout_sec: ${WAF_READ_TIMEOUT_SEC:-60}
+EOF
+	[[ -n ${WAF_REALTIME_PATH:-} ]] && echo "  realtime: {path: ${WAF_REALTIME_PATH}, servers: $(yaml_list "${WAF_REALTIME_UPSTREAM:?WAF_REALTIME_UPSTREAM richiesto con WAF_REALTIME_PATH}")}"
+	echo "tls: {mode: ${WAF_TLS_MODE:-off}}"
+	[[ -n ${WAF_TRUSTED_PROXIES:-} ]] && echo "client_ip: {source: xff, trusted_proxies: $(yaml_list "$WAF_TRUSTED_PROXIES")}"
+	[[ -n ${WAF_MODE:-} ]] && echo "mode: ${WAF_MODE}"
+	[[ -n ${WAF_DEFAULT_ACTION:-} ]] && echo "default_action: ${WAF_DEFAULT_ACTION}"
+	[[ -n ${WAF_BODY_LIMIT:-} ]] && echo "body_limit: ${WAF_BODY_LIMIT}"
+	[[ -n ${WAF_RATE_LIMIT:-} ]] && echo "rate_limit: {limit: ${WAF_RATE_LIMIT}, window_sec: ${WAF_RATE_WINDOW_SEC:-300}, action: ${WAF_RATE_ACTION:-block}}"
+	[[ -n ${WAF_GEO_BLOCK:-} ]] && echo "geo_block: {countries: $(yaml_list "$WAF_GEO_BLOCK"), action: ${WAF_GEO_ACTION:-block}}"
+	return 0
+}
+
+# Ricostruisce la config effettiva in $CFG (swap atomico della directory).
+build_config() {
+	local tmp="${CFG}.tmp" f n=0
+	rm -rf "$tmp"
+	mkdir -p "$tmp/sites" "$STATE/config"
+	if [[ -f $SRC/node.yaml ]]; then cp "$SRC/node.yaml" "$tmp/node.yaml"; else gen_node >"$tmp/node.yaml"; fi
+	shopt -s nullglob
+	for f in "$SRC"/sites/*.yaml "$SRC"/sites/*.yml; do cp "$f" "$tmp/sites/"; n=$((n + 1)); done
+	if [[ -n ${WAF_UPSTREAM:-} ]]; then
+		[[ -e $tmp/sites/${WAF_SITE_ID:-app}.yaml ]] && die "sito ${WAF_SITE_ID:-app} definito sia in /config/sites sia da WAF_UPSTREAM"
+		gen_site >"$tmp/sites/${WAF_SITE_ID:-app}.yaml"
+		n=$((n + 1))
+	fi
+	((n > 0)) || die "nessun sito: imposta WAF_UPSTREAM (+ WAF_SERVER_NAMES) o monta file in /config/sites/"
+	for d in profiles pages; do [[ -d $SRC/$d ]] && cp -r "$SRC/$d" "$tmp/$d"; done
+	# liste personalizzate (es. custom-reputation.txt): /config/lists/*.txt → /etc/waf/lists
+	for f in "$SRC"/lists/*.txt; do cp "$f" /etc/waf/lists/; done
+	shopt -u nullglob
+	ln -s "$STATE/config" "$tmp/state" # state/bypass.yaml persistente
+	rm -rf "$CFG"
+	mv "$tmp" "$CFG"
+}
+
+# Liste di default dall'immagine se il volume è vuoto; permessi log.
+seed() {
+	local f
+	shopt -s nullglob
+	for f in /opt/waf/lists-default/*.txt; do [[ -e /etc/waf/lists/${f##*/} ]] || cp "$f" /etc/waf/lists/; done
+	shopt -u nullglob
+	mkdir -p /srv/waf/raw "$STATE"
+	chown nginx:nginx /var/log/waf
+}
+
+prune() {
+	local cur keep="${WAF_KEEP_REVS:-5}"
+	cur="$(readlink "$RT/current" 2>/dev/null || true)"
+	ls -1dt "$RT"/2*-* 2>/dev/null | tail -n +"$((keep + 1))" | while read -r d; do
+		[[ ${d##*/} == "$cur" ]] || rm -rf "$d"
+	done
+}
+
+wait_rev() { # attende che i worker servano la rev $1
+	local i
+	for i in $(seq 1 30); do
+		[[ "$(wget -qO- http://127.0.0.1:8090/__rev 2>/dev/null)" == "$RT/$1" ]] && return 0
+		sleep 0.5
+	done
+	log "attenzione: i worker non servono ancora la rev $1 (vedi /var/log/waf/error.log)"
+	return 1
+}
+
+switch_to() { # rev
+	ln -sfn "$1" "$RT/current.new"
+	mv -T "$RT/current.new" "$RT/current"
+	if nginx_running; then
+		nginx -s reload -c "$RT/current/nginx/nginx.conf"
+		wait_rev "$1" || true
+	fi
+	log "rev attiva: $1"
+}
+
+lists_sum() { cat /etc/waf/lists/*.txt 2>/dev/null | md5sum | cut -d' ' -f1; }
+
+do_reload() {
+	local force=0 new rev cur lsum
+	[[ ${1:-} == -f ]] && force=1
+	build_config
+	new="$(wafctl render)" || die "render fallito (config non valida?)"
+	rev="${new##*/}"
+	cur="$(readlink "$RT/current" 2>/dev/null || true)"
+	lsum="$(lists_sum)"
+	if ((force == 0)) && [[ -n $cur && -e $RT/$cur && ${cur##*-} == "${rev##*-}" ]]; then
+		rm -rf "$new" # stessa config (stesso hash)
+		if [[ $lsum != "$(cat "$STATE/lists.sum" 2>/dev/null)" ]] && nginx_running; then
+			# le liste (@ipMatchFromFile) si rileggono solo al reload di nginx
+			nginx -s reload -c "$RT/current/nginx/nginx.conf"
+			echo "$lsum" >"$STATE/lists.sum"
+			log "liste IP cambiate: nginx ricaricato"
+		fi
+		return 0
+	fi
+	if ! nginx -t -q -c "$new/nginx/nginx.conf"; then
+		rm -rf "$new"
+		die "nginx -t fallito: la config attiva resta ${cur:-nessuna}"
+	fi
+	switch_to "$rev"
+	echo "$lsum" >"$STATE/lists.sum"
+	prune
+}
+
+do_rotate() {
+	local max=$((${WAF_LOG_MAX_SIZE_MB:-512} * 1024 * 1024)) ts reopen=0 audit=0 f slot
+	ts="$(date -u +%Y%m%dT%H%M%SZ)"
+	for f in access.log error.log; do
+		if [[ -f /var/log/waf/$f ]] && (($(stat -c %s "/var/log/waf/$f") > max)); then
+			mv "/var/log/waf/$f" "/var/log/waf/$f.$ts"
+			reopen=1
+		fi
+	done
+	if [[ -f /var/log/waf/audit.log ]] && (($(stat -c %s /var/log/waf/audit.log) > max)); then
+		mv /var/log/waf/audit.log "/var/log/waf/audit.log.$ts"
+		audit=1
+	fi
+	((reopen)) && nginx_running && nginx -s reopen -c "$RT/current/nginx/nginx.conf"
+	if ((audit)); then
+		# ModSecurity riapre l'audit log solo se il suo path cambia: si alterna lo slot (come `wafctl logs rotate`)
+		slot="$(cat "$STATE/audit-slot" 2>/dev/null || echo 0)"
+		echo $(((slot + 1) % 2)) >"$STATE/audit-slot"
+		do_reload
+	fi
+	find /var/log/waf -maxdepth 1 -name '*.log.2*' ! -name '*.gz' -mmin +10 -exec gzip -q {} \; 2>/dev/null || true
+	find /var/log/waf -maxdepth 1 -name '*.log.2*' -mmin +$((${WAF_LOG_KEEP_HOURS:-24} * 60)) -delete 2>/dev/null || true
+	find /srv/waf/raw -mindepth 1 -maxdepth 1 -type d -mtime +"${WAF_RAW_DAYS:-7}" -exec rm -rf {} + 2>/dev/null || true
+}
+
+do_lists_update() {
+	local out
+	out="$(wafctl lists update --no-apply "$@")" || { echo "$out"; die "aggiornamento liste fallito (nessuna lista sostituita)"; }
+	echo "$out"
+	if grep -q 'lists changed' <<<"$out"; then do_reload; fi
+}
+
+do_status() {
+	local cur
+	cur="$(readlink "$RT/current" 2>/dev/null || echo -)"
+	echo "rev attiva:  $cur"
+	echo "nginx:       $(nginx_running && echo running || echo stopped)"
+	echo "worker rev:  $(wget -qO- http://127.0.0.1:8090/__rev 2>/dev/null || echo -)"
+	echo "siti:        $(cd "$CFG/sites" 2>/dev/null && ls -1 | sed 's/\.ya\?ml$//' | tr '\n' ' ')"
+	echo "liste:"
+	wc -l /etc/waf/lists/*.txt 2>/dev/null | sed 's/^/  /'
+}
+
+cmd="${1:-help}"
+shift || true
+case "$cmd" in
+config)
+	build_config
+	echo "# $CFG/node.yaml"
+	cat "$CFG/node.yaml"
+	for f in "$CFG"/sites/*; do echo "# $f"; cat "$f"; done
+	;;
+validate) build_config && exec wafctl validate "$@" ;;
+explain) exec wafctl explain "$@" ;;
+reload | apply) exec 9>"$LOCK"; flock 9; seed; do_reload "$@" ;;
+rollback)
+	[[ -n ${1:-} && -d $RT/$1 ]] || die "usage: waf rollback <rev>  (rev in: $(ls "$RT" | grep -v current | tr '\n' ' '))"
+	exec 9>"$LOCK"; flock 9
+	nginx -t -q -c "$RT/$1/nginx/nginx.conf" || die "nginx -t fallito su $1"
+	switch_to "$1"
+	;;
+bypass)
+	case "${1:-}" in
+	list | "") exec wafctl bypass list ;;
+	esac
+	# wafctl bypass salva lo stato e poi tenta un apply via docker (assente qui): l'apply lo fa waf reload
+	wafctl bypass "$@" 2> >(grep -v 'docker' >&2) || true
+	exec 9>"$LOCK"; flock 9
+	do_reload
+	wafctl bypass list
+	;;
+lists-update) exec 9>"$LOCK"; flock 9; do_lists_update "$@" ;;
+rotate) exec 9>"$LOCK"; flock 9; do_rotate ;;
+status) do_status ;;
+wafctl) exec wafctl "$@" ;;
+_init) seed; build_config; do_reload -f ;; # usato dall'entrypoint (nginx non ancora avviato)
+help | -h | --help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
+*) die "comando sconosciuto: $cmd (waf help)" ;;
+esac

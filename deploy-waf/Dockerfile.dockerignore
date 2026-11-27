@@ -1,0 +1,10 @@
+# build context = root del repo: si invia solo ciò che serve all'immagine aio
+*
+!wafctl/
+wafctl/bin/
+!waf/
+!profiles/
+!scripts/fetch-ip-lists.sh
+!data/ip-reputation/
+!deploy/vector/node.yaml
+!deploy-waf/bin/

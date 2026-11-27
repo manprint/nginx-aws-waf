@@ -1,0 +1,6 @@
+# GeoIP non disponibile (data/geoip vuota): eventi a ClickHouse senza paese/ASN.
+transforms:
+  events_geo:
+    type: remap
+    inputs: [events_out]
+    source: '.'

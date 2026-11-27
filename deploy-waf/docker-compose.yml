@@ -1,0 +1,83 @@
+# WAF (stile AWS WAF, nginx + ModSecurity) davanti a un nginx esistente.
+#
+#   client ──80/443──► waf ──https──► nginx (le tue config) ──► applicazioni
+#                       │
+#                       └─ log ──► metrics (Vector) ──► :9598/metrics (Prometheus)
+#
+# Tutte le opzioni sono in .env (vedi .env.example). Guida completa: README.md
+
+services:
+
+  # ---------------------------------------------------------------- WAF
+  # Unico servizio esposto su 80/443. Ispeziona ogni richiesta e passa quelle pulite a nginx.
+  # Il nome "waf" non va cambiato (lo usa la raccolta metriche).
+  waf:
+    image: ${WAF_IMAGE:-nginx-aws-waf/aio:latest}
+    build:
+      context: ..
+      dockerfile: deploy-waf/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${HTTP_PORT:-80}:8080"
+      - "${BIND_ADDRESS:-0.0.0.0}:${HTTPS_PORT:-443}:8443"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      WAF_UPSTREAM: ${WAF_UPSTREAM-nginx:443}
+      WAF_UPSTREAM_TLS: ${WAF_UPSTREAM_TLS:-true}
+      WAF_TLS_MODE: ${WAF_TLS_MODE:-redirect}
+      WAF_DEFAULT_SITE: ${WAF_DEFAULT_SITE-app}
+      WAF_NODE_ID: ${WAF_NODE_ID:-waf}
+    volumes:
+      - ./config:/config:ro             # siti aggiuntivi, liste IP personali (opzionale)
+      - ./certs:/etc/waf/certs:ro       # certs/app/fullchain.pem + privkey.pem
+      - ./geoip:/etc/waf/geoip:ro       # GeoLite2 (opzionale)
+      - ./logs:/var/log/waf             # access.log, audit.log, error.log
+      - ./data/runtime:/etc/waf/runtime   # config nginx/ModSecurity generate (una cartella per versione)
+      - ./data/lists:/etc/waf/lists       # liste IP di reputazione
+      - ./data/state:/srv/waf/state       # bypass attivi, stato rotazione log
+      - ./data/raw:/srv/waf/raw           # eventi JSONL (scritti da metrics)
+    tmpfs: [/tmp]
+    ulimits:
+      nofile: {soft: 65535, hard: 65535}
+    stop_grace_period: 30s
+    depends_on: [nginx]
+
+  # ---------------------------------------------------------------- METRICHE
+  # Legge i log del WAF e pubblica le metriche Prometheus su :9598/metrics.
+  metrics:
+    image: timberio/vector:0.62.0-alpine
+    restart: unless-stopped
+    depends_on:
+      waf: {condition: service_healthy}
+    command:
+      - --config
+      - /etc/vector/node.yaml
+      - --config
+      - /etc/vector/metrics.yaml
+      - --config
+      - /etc/waf/runtime/current/vector/forward.yaml
+    ports:
+      - "${METRICS_BIND_ADDRESS:-0.0.0.0}:${METRICS_PORT:-9598}:9598"
+    volumes:
+      - ./vector:/etc/vector:ro
+      - ./logs:/var/log/waf:ro
+      - ./data/runtime:/etc/waf/runtime:ro
+      - ./data/raw:/var/lib/waf/raw     # eventi JSONL: data/raw/<giorno>/events.jsonl, matches.jsonl
+      - ./data/vector:/var/lib/vector   # stato di Vector (posizione di lettura dei log)
+      - /proc:/host/proc:ro             # metriche dell'host, non del container
+      - /sys:/host/sys:ro
+    environment:
+      PROCFS_ROOT: /host/proc
+      SYSFS_ROOT: /host/sys
+
+  # ---------------------------------------------------------------- IL TUO NGINX
+  # Sostituisci con il tuo servizio nginx. Unica regola: NESSUNA sezione "ports",
+  # le porte 80/443 dell'host ora sono del WAF.
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./nginx:/etc/nginx/conf.d:ro
+      - ./certs/app:/certs:ro

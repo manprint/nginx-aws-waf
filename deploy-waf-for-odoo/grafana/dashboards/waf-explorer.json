@@ -1,0 +1,265 @@
+{
+  "uid": "waf-explorer",
+  "title": "WAF Request Explorer",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "tags": [
+    "waf"
+  ],
+  "timezone": "utc",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "site",
+        "label": "Sito",
+        "hide": 0,
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "ch"
+        },
+        "definition": "SELECT DISTINCT site_id FROM waf.agg_requests_1m WHERE minute > now() - INTERVAL 30 DAY ORDER BY site_id",
+        "query": "SELECT DISTINCT site_id FROM waf.agg_requests_1m WHERE minute > now() - INTERVAL 30 DAY ORDER BY site_id",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "'__all__'",
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "ip",
+        "label": "IP",
+        "hide": 0,
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "rule",
+        "label": "Regola terminante",
+        "hide": 0,
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "action",
+        "label": "Azione",
+        "hide": 0,
+        "type": "custom",
+        "query": "ALLOW,BLOCK,FAIL",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "'__all__'",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [
+          {
+            "text": "ALLOW",
+            "value": "ALLOW",
+            "selected": false
+          },
+          {
+            "text": "BLOCK",
+            "value": "BLOCK",
+            "selected": false
+          },
+          {
+            "text": "FAIL",
+            "value": "FAIL",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "name": "rid",
+        "label": "Request ID",
+        "hide": 0,
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Ultimi 500 eventi",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 12
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT ts, site_id, client_ip, country, method, path, status, action, shadow_action, terminating_rule, request_id FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND (${ip:sqlstring} = '' OR client_ip = ${ip:sqlstring}) AND (${rule:sqlstring} = '' OR terminating_rule = ${rule:sqlstring} OR endsWith(terminating_rule, concat('/', ${rule:sqlstring}))) AND ('__all__' IN (${action:singlequote}) OR action IN (${action:singlequote})) ORDER BY ts DESC LIMIT 500",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Match della richiesta $rid",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT rule_group, rule_name, configured_action, in_scope, post_terminating, variable, value FROM waf.matches WHERE $__timeFilter(ts) AND request_id = ${rid:sqlstring} ORDER BY post_terminating, rule_id",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 3,
+      "type": "piechart",
+      "title": "Paesi",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT if(country = '', '??', country) AS cc, count() AS requests FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) GROUP BY cc ORDER BY requests DESC LIMIT 15",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "ASN (top)",
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT asn, as_org, count() AS requests, countIf(action = 'BLOCK') AS blocked FROM waf.events WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) GROUP BY asn, as_org ORDER BY requests DESC LIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    }
+  ]
+}

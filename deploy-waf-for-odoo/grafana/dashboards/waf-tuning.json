@@ -1,0 +1,231 @@
+{
+  "uid": "waf-tuning",
+  "title": "WAF Rules & Tuning",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "tags": [
+    "waf"
+  ],
+  "timezone": "utc",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "site",
+        "label": "Sito",
+        "hide": 0,
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "ch"
+        },
+        "definition": "SELECT DISTINCT site_id FROM waf.agg_requests_1m WHERE minute > now() - INTERVAL 30 DAY ORDER BY site_id",
+        "query": "SELECT DISTINCT site_id FROM waf.agg_requests_1m WHERE minute > now() - INTERVAL 30 DAY ORDER BY site_id",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "'__all__'",
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Regole in COUNT per sito (candidati would-block)",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT site_id, rule_group, rule_name, sum(matches) AS matches FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND configured_action = 'COUNT' GROUP BY site_id, rule_group, rule_name ORDER BY matches DESC LIMIT 100",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Match per regola (top 10)",
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "timeseries",
+          "format": 0,
+          "rawSql": "SELECT $__timeInterval(minute) AS time, rule_name, sum(matches) AS matches FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND rule_name IN (SELECT rule_name FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) GROUP BY rule_name ORDER BY sum(matches) DESC LIMIT 10) GROUP BY time, rule_name ORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "fillOpacity": 10,
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Disaccordi vs AWS default per sito e user_class",
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT site_id, user_class, action, aws_default_action, sum(requests) AS requests FROM waf.agg_requests_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND action != aws_default_action GROUP BY site_id, user_class, action, aws_default_action ORDER BY requests DESC LIMIT 100",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Path delle regole in COUNT",
+      "gridPos": {
+        "x": 12,
+        "y": 19,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT rule_name, path, count() AS matches FROM waf.matches WHERE $__timeFilter(ts) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) AND configured_action = 'COUNT' GROUP BY rule_name, path ORDER BY matches DESC LIMIT 100",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 5,
+      "type": "barchart",
+      "title": "Match per user_class",
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "ch"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "ch"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT user_class, sum(matches) AS matches FROM waf.agg_matches_1m WHERE $__timeFilter(minute) AND ('__all__' IN (${site:singlequote}) OR site_id IN (${site:singlequote})) GROUP BY user_class ORDER BY matches DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "xField": "user_class",
+        "orientation": "horizontal"
+      }
+    }
+  ]
+}

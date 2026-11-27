@@ -1,0 +1,12 @@
+# Segreti e dati locali: si versionano solo esempi e segnaposto (.gitkeep)
+.env
+certs/**
+!certs/**/
+!certs/**/.gitkeep
+geoip/*
+!geoip/.gitkeep
+config/sites/*
+!config/sites/.gitkeep
+config/node.yaml
+config/secrets.env
+config/lists/*.txt

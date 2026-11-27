@@ -1,0 +1,57 @@
+# Esempio di sito con tutte le opzioni. Copialo in config/sites/<site_id>.yaml (il nome file deve
+# coincidere con site_id) e adattalo. Riferimento completo: docs/config-reference.md
+version: 1
+site_id: site-full
+server_names: [www.interno.local, interno.local]      # minuscolo, ammesso *.dominio
+app: generic                                          # generic | odoo
+profile: aws-default                                  # aws-default | shadow | strict | odoo-12/14/16/18
+
+upstream:
+  servers: ["10.0.0.10:8080", "10.0.0.11:8080"]       # bilanciati round robin
+  tls: false                                          # true = HTTPS verso il backend
+  max_body_size: 20m                                  # client_max_body_size
+  read_timeout_sec: 120
+  # realtime: {path: /websocket, servers: ["10.0.0.10:8072"]}   # Odoo
+
+tls:
+  mode: redirect                                      # off | on | redirect (HTTP → 301 HTTPS)
+  # cert: fullchain.pem                               # in certs/site-full/
+  # key: privkey.pem
+
+# IP reale del client da X-Forwarded-For, solo se arriva da questi proxy
+client_ip: {source: xff, trusted_proxies: ["10.0.0.0/8"]}
+
+mode: enforce                                         # enforce | count (shadow: logga senza bloccare)
+default_action: allow                                 # allow | block
+body_limit: 16384                                     # byte di body ispezionati (8192 = AWS default)
+fail: {pcre_limit: closed, body_error: open}          # closed (500) | block (403) | open
+block_page: aws                                       # aws | file in config/pages/
+
+rule_groups:
+  - name: AWSManagedRulesCommonRuleSet
+    rule_action_overrides: {SizeRestrictions_BODY: count, NoUserAgent_HEADER: count}
+  - name: AWSManagedRulesKnownBadInputsRuleSet
+    scope_down: {all: [{uri_path: {starts_with: /static/}, negate: true}]}
+  - name: AWSManagedRulesSQLiRuleSet                  # opzionale, disabilitato di default
+    enabled: true
+  # - name: AWSManagedRulesAmazonIpReputationList
+  #   override_action: count                          # tutto il gruppo in Count
+
+custom_rules:
+  - name: AllowOffice                                 # mai bloccare l'ufficio
+    slot: start
+    action: allow
+    match: {all: [{ip_set: [192.168.10.0/24]}]}
+  - name: BlockAdminFromOutside
+    slot: start
+    action: block
+    match:
+      all:
+        - {uri_path: {starts_with: /admin}}
+        - {ip_set: [10.0.0.0/8, 192.168.0.0/16], negate: true}
+
+path_overrides:
+  - {path_prefix: /upload/, rules: {SizeRestrictions_BODY: allow}}
+
+rate_limit: {limit: 1000, window_sec: 300, action: block}     # per IP
+# geo_block: {countries: [CN, RU], action: block}             # richiede WAF_GEOIP=true + mmdb

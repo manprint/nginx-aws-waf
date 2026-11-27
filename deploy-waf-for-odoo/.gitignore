@@ -1,0 +1,3 @@
+# Segreti locali (password ClickHouse, chiave MaxMind): si versiona solo .env.example
+.env
+addons/

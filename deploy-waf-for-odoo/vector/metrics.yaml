@@ -1,0 +1,79 @@
+# Metriche Prometheus del WAF (aggiunta a vector/node.yaml + runtime/current/vector/forward.yaml).
+# Esposte su http://<host>:9598/metrics
+#
+#   waf_requests_total{site,action,shadow_action,mode,status}     richieste viste dal WAF
+#   waf_blocked_requests_total{site,rule,type}                     richieste bloccate, per regola che termina
+#   waf_rule_matches_total{site,rule_group,rule,configured_action,request_action}  match per regola (anche in COUNT)
+#   waf_request_duration_seconds{site}                             latenza totale (istogramma)
+#   waf_upstream_duration_seconds{site}                            latenza del backend (istogramma)
+#   nginx_*{node_id}                                               stub_status (connessioni, richieste)
+#   host_*{node_id}                                                cpu, memoria, load, disco, rete
+#   vector_*{node_id}                                              salute della pipeline log
+
+transforms:
+  m_requests:
+    type: log_to_metric
+    inputs: [events_out]
+    metrics:
+      - type: counter
+        field: request_id
+        namespace: waf
+        name: requests_total
+        tags:
+          site: "{{ site_id }}"
+          action: "{{ action }}"
+          shadow_action: "{{ shadow_action }}"
+          mode: "{{ waf_mode }}"
+          status: "{{ status }}"
+      - type: histogram
+        field: request_time
+        namespace: waf
+        name: request_duration_seconds
+        tags: {site: "{{ site_id }}"}
+      - type: histogram
+        field: upstream_time
+        namespace: waf
+        name: upstream_duration_seconds
+        tags: {site: "{{ site_id }}"}
+
+  blocked_only:
+    type: filter
+    inputs: [events_out]
+    condition: '.action == "BLOCK"'
+
+  m_blocked:
+    type: log_to_metric
+    inputs: [blocked_only]
+    metrics:
+      - type: counter
+        field: request_id
+        namespace: waf
+        name: blocked_requests_total
+        tags:
+          site: "{{ site_id }}"
+          rule: "{{ terminating_rule }}"
+          type: "{{ terminating_type }}"
+
+  m_matches:
+    type: log_to_metric
+    inputs: [matches_out]
+    metrics:
+      - type: counter
+        field: rule_name
+        namespace: waf
+        name: rule_matches_total
+        tags:
+          site: "{{ site_id }}"
+          rule_group: "{{ rule_group }}"
+          rule: "{{ rule_name }}"
+          configured_action: "{{ configured_action }}"
+          request_action: "{{ request_action }}"
+
+sinks:
+  prometheus:
+    type: prometheus_exporter
+    inputs: [m_requests, m_blocked, m_matches, m_tag]
+    address: "0.0.0.0:9598"
+    # un contatore non aggiornato non sparisce prima di 24 h (niente reset finti in Prometheus)
+    flush_period_secs: 86400
+    buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60]

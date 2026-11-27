@@ -1,0 +1,8 @@
+# Grafana dietro lo stesso WAF (profilo AWS standard).
+version: 1
+site_id: grafana
+server_names: [grafana.localhost]
+app: generic
+profile: aws-default
+upstream:
+  servers: ["nginx:80"]

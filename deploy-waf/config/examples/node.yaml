@@ -1,0 +1,12 @@
+# Opzionale: copialo in config/node.yaml per non usare le variabili WAF_* del nodo.
+# Con network: bridge le porte di ascolto devono coincidere con quelle pubblicate nel compose
+# (WAF_HTTP_LISTEN / WAF_HTTPS_LISTEN, default 8080/8443).
+version: 1
+node_id: waf-aio
+role: node
+network: bridge            # bridge | host
+listen: {http: 8080, https: 8443, ipv6: false}
+workers: 0                 # 0 = auto
+geoip: {enabled: false}
+audit: {scope: all}        # all | relevant
+# default_site: app        # Host sconosciuto → questo sito (default: 444)

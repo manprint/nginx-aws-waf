@@ -1,0 +1,226 @@
+# WAF node log pipeline: nginx access JSON + ModSecurity audit JSON → joined events + matches (raw JSONL) + heartbeat; forwarding to central is the rendered runtime/current/vector/forward.yaml (3.1). Source: plan 001 snippets/vector-node.yaml (1.7).
+data_dir: /var/lib/vector
+
+sources:
+  # One file source for both logs (3.1): a single file server reads both files in the same pass,
+  # so the two halves of a request reach the join together. With two sources each idle file
+  # server backs off independently (Vector 0.62: up to ~8 s), which delayed and could split joins.
+  waf_logs:
+    type: file
+    include: [/var/log/waf/access.log, /var/log/waf/audit.log]
+    read_from: beginning
+    max_line_bytes: 4194304
+    # default 2048 B per file per pass: audit lines with bodies (up to ~1 MiB) took several passes
+    # each and a corpus burst reached the join ~7 s late (6.5 G-FINAL step 3, ≤ 10 s end to end)
+    max_read_bytes: 1048576
+  # Heartbeat (3.1): current runtime meta.json (single-line JSON) every 30 s.
+  hb_exec:
+    type: exec
+    mode: scheduled
+    scheduled: {exec_interval_secs: 30}
+    command: ["cat", "/etc/waf/runtime/current/meta.json"]
+
+transforms:
+  hb_parse:
+    type: remap
+    inputs: [hb_exec]
+    drop_on_error: true
+    source: |
+      m = object!(parse_json!(string!(.message)))
+      . = {"ts": format_timestamp!(now(), "%Y-%m-%dT%H:%M:%S%.3fZ", timezone: "UTC"),
+           "node_id": m.node_id, "version": m.version, "config_rev": m.config_rev, "sites": m.sites}
+
+  access_parse:
+    type: remap
+    inputs: [waf_logs]
+    drop_on_error: true
+    source: |
+      if .file != "/var/log/waf/access.log" { abort }
+      a = parse_json!(.message)
+      . = {"rid": a.rid, "access": a}
+
+  audit_parse:
+    type: remap
+    inputs: [waf_logs]
+    drop_on_error: true
+    source: |
+      if .file != "/var/log/waf/audit.log" { abort }
+      t = parse_json!(.message).transaction
+      . = {"rid": t.unique_id, "audit": t}
+
+  joined:
+    type: reduce
+    inputs: [access_parse, audit_parse]
+    group_by: [rid]
+    # access + audit → flush at once; access-only (not inspected) after 3 s
+    max_events: 2
+    expire_after_ms: 3000
+    flush_period_ms: 500
+    merge_strategies:
+      access: discard
+      audit: discard
+
+  shaped:
+    type: remap
+    inputs: [joined]
+    drop_on_error: true
+    source: |
+      a = object(.access) ?? {}
+      t = object(.audit) ?? {}
+      ev = {}
+      ev.request_id = string!(.rid)
+      ms = to_float(a.msec) ?? to_float(to_unix_timestamp(now(), unit: "milliseconds")) / 1000.0
+      ev.ts = format_timestamp!(from_unix_timestamp!(to_int(ms * 1000.0), unit: "milliseconds"), "%Y-%m-%dT%H:%M:%S%.3fZ", timezone: "UTC")
+      ev.node_id = string(a.node) ?? "unknown"
+      ev.site_id = string(a.site) ?? "__default__"
+      ev.app = string(a.app) ?? "generic"
+      ev.host = string(a.host) ?? ""
+      ev.client_ip = string(a.ra) ?? string(t.client_ip) ?? ""
+      ev.client_port = to_int(a.rp) ?? 0
+      ev.peer_ip = string(a.realip) ?? ""
+      ev.method = string(a.method) ?? ""
+      ev.scheme = string(a.scheme) ?? ""
+      ev.http_version = string(a.proto) ?? ""
+      ev.tls_protocol = string(a.ssl) ?? ""
+      ev.uri = string(a.uri) ?? ""
+      parts = split(ev.uri, "?", limit: 2)
+      ev.path = string(parts[0]) ?? ""
+      ev.query = string(parts[1]) ?? ""
+      ev.status = to_int(a.status) ?? 0
+      ev.bytes_sent = to_int(a.bytes) ?? 0
+      ev.request_length = to_int(a.req_len) ?? 0
+      ev.request_time = to_float(a.rt) ?? 0.0
+      ev.upstream_time = to_float(a.urt) ?? 0.0
+      ev.upstream_status = string(a.ust) ?? ""
+      ev.upstream_addr = string(a.uaddr) ?? ""
+      ev.user_agent = string(a.ua) ?? ""
+      ev.referer = string(a.ref) ?? ""
+      ev.content_type = string(a.ct) ?? ""
+      ev.content_length = to_int(a.cl) ?? -1
+      ev.rate_limit_status = string(a.rl) ?? ""
+      ev.waf_inspected = if exists(.audit) { 1 } else { 0 }
+
+      # --- user class (Odoo-aware)
+      p = downcase(ev.path)
+      ev.user_class = if ev.app != "odoo" { "other" }
+        else if match(p, r'^/(web/(static|assets|image|content)|website/static|[a-z_]+/static)/') { "static" }
+        else if match(p, r'^/(longpolling|websocket)') { "realtime" }
+        else if match(p, r'^/(xmlrpc|jsonrpc|json/|api/)') { "api" }
+        else if match(p, r'^/(web|odoo)(/|$|\?)') || starts_with(p, "/mail/") { "backend" }
+        else { "website" }
+
+      # --- ModSecurity messages
+      msgs = array(t.messages) ?? []
+      summary = {}
+      final = ""
+      rows = []
+      for_each(msgs) -> |_i, m| {
+        msg = string(m.message) ?? ""
+        d = object(m.details) ?? {}
+        data = string(d.data) ?? ""
+        if msg == "AWSWAF_SUMMARY" {
+          summary = parse_key_value(data, field_delimiter: ";", key_value_delimiter: "=") ?? {}
+        } else if msg == "AWSWAF_BLOCK" || msg == "AWSWAF_DEFAULT_BLOCK" || msg == "AWSWAF_FAIL" {
+          final = msg
+        } else if starts_with(msg, "AWSWAF 1") {
+          tags = array(d.tags) ?? []
+          rule_tag = ""
+          label_tag = ""
+          for_each(tags) -> |_j, tg| {
+            s = string(tg) ?? ""
+            if starts_with(s, "awswaf-rule:") { rule_tag = slice!(s, 12) }
+            if starts_with(s, "awswaf-label:") { label_tag = slice!(s, 13) }
+          }
+          rp = split(rule_tag, "/", limit: 2)
+          ld = parse_regex(data, r'^a=(?P<a>[^;]*);tb=(?P<tb>\d*);ab=(?P<ab>\d*);sc=(?P<sc>\d*);v=(?P<v>.*?);x=(?P<x>.*)$') ?? {}
+          rid_num = to_int(d.ruleId) ?? 0
+          base = rid_num - mod(rid_num, 10)
+          tb = to_int(string(ld.tb) ?? "0") ?? 0
+          ab = to_int(string(ld.ab) ?? "0") ?? 0
+          in_scope = 0
+          if (string(ld.sc) ?? "1") == "1" { in_scope = 1 }
+          post_t = 0
+          if tb != 0 && tb != base { post_t = 1 }
+          aws_post_t = 0
+          if ab != 0 && ab != base { aws_post_t = 1 }
+          rows = push(rows, {
+            "rule_id": base,
+            "rule_group": string(rp[0]) ?? "",
+            "rule_name": string(rp[1]) ?? "",
+            "label": label_tag,
+            "configured_action": upcase(string(ld.a) ?? ""),
+            "in_scope": in_scope,
+            "post_terminating": post_t,
+            "aws_post_terminating": aws_post_t,
+            "variable": string(ld.v) ?? "",
+            "value": truncate(string(ld.x) ?? "", 1024)
+          })
+        }
+      }
+
+      term = to_int(string(summary.term) ?? "0") ?? 0
+      awsterm = to_int(string(summary.aws) ?? "0") ?? 0
+      ta = string(summary.ta) ?? "none"
+      da = string(summary.da) ?? "allow"
+      default_mode = "off"
+      if exists(.audit) { default_mode = "enforce" }
+      ev.waf_mode = string(summary.mode) ?? default_mode
+      ev.fail_reason = if (string(summary.fail) ?? "none") == "none" { "" } else { string!(summary.fail) }
+      ev.action = if final == "AWSWAF_FAIL" { "FAIL" }
+        else if final != "" { "BLOCK" }
+        else if ev.rate_limit_status == "REJECTED" { "BLOCK" }
+        else { "ALLOW" }
+      ev.shadow_action = if ta == "block" || (term == 0 && da == "block") { "BLOCK" } else { "ALLOW" }
+      ev.terminating_rule_id = term
+      ev.terminating_rule = "Default_Action"
+      ev.aws_default_rule = ""
+      for_each(rows) -> |_k, r| {
+        if r.rule_id == term && term != 0 { ev.terminating_rule = string!(r.rule_group) + "/" + string!(r.rule_name) }
+        if r.rule_id == awsterm && awsterm != 0 { ev.aws_default_rule = string!(r.rule_group) + "/" + string!(r.rule_name) }
+      }
+      ev.terminating_type = if ev.rate_limit_status == "REJECTED" { "RATE_BASED" }
+        else if term >= 1500000 && term < 1600000 { "REGULAR" }
+        else if term != 0 { "MANAGED_RULE_GROUP" }
+        else { "DEFAULT" }
+      ev.aws_default_action = if awsterm != 0 { "BLOCK" } else { "ALLOW" }
+      labels = []
+      for_each(rows) -> |_k, r| {
+        if r.in_scope == 1 && r.post_terminating == 0 && r.label != "" { labels = push(labels, r.label) }
+      }
+      ev.labels = unique(labels)
+      ev.match_count = length(rows)
+      req = object(t.request) ?? {}
+      res = object(t.response) ?? {}
+      ev.request_headers = object(req.headers) ?? {}
+      ev.response_headers = object(res.headers) ?? {}
+      ev.request_body = string(req.body) ?? ""
+      ev._rows = rows
+      . = ev
+
+  events_out:
+    type: remap
+    inputs: [shaped]
+    source: |
+      del(._rows)
+
+  matches_out:
+    type: remap
+    inputs: [shaped]
+    source: |
+      ctx = {"ts": .ts, "request_id": .request_id, "node_id": .node_id, "site_id": .site_id,
+             "method": .method, "path": .path, "client_ip": .client_ip, "user_class": .user_class,
+             "request_action": .action}
+      rows = array(._rows) ?? []
+      . = map_values(rows) -> |r| { merge(ctx, object!(r)) }
+
+sinks:
+  raw_file:
+    type: file
+    inputs: [events_out]
+    path: /var/lib/waf/raw/%Y-%m-%d/events.jsonl
+    encoding: {codec: json}
+  raw_matches:
+    type: file
+    inputs: [matches_out]
+    path: /var/lib/waf/raw/%Y-%m-%d/matches.jsonl
+    encoding: {codec: json}

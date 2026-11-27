@@ -1,0 +1,18 @@
+# GeoIP attivo (scelto all'avvio di "metrics" se data/geoip contiene i due .mmdb):
+# aggiunge country / asn / as_org agli eventi prima di ClickHouse.
+enrichment_tables:
+  geo_country: {type: mmdb, path: /etc/waf/geoip/GeoLite2-Country.mmdb}
+  geo_asn: {type: mmdb, path: /etc/waf/geoip/GeoLite2-ASN.mmdb}
+transforms:
+  events_geo:
+    type: remap
+    inputs: [events_out]
+    source: |
+      ip = string(.client_ip) ?? ""
+      c, err = get_enrichment_table_record("geo_country", {"ip": ip})
+      if err == null { .country = string(c.country.iso_code) ?? "" }
+      a, err2 = get_enrichment_table_record("geo_asn", {"ip": ip})
+      if err2 == null {
+        .asn = to_int(a.autonomous_system_number) ?? 0
+        .as_org = string(a.autonomous_system_organization) ?? ""
+      }
