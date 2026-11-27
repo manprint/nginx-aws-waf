@@ -171,3 +171,12 @@
 ## 3.6 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
 - NEW docs/observability.md (IT): flusso dati, stack centrale + utenti, tabelle + significato campi, comandi logs/stats/report, `--raw`, export + mappatura AWS, retention, migrazioni, GeoIP. WRITE README.md (sezione "Osservabilità", mappa directory, link), docs/operations.md (`$WAF_CENTRAL_DIR`, ruoli/compose, `secrets init`, migrate/retention).
 - G-U36 self-review evidence: every command in observability.md and the README section executed on the lab (logs search ×4 incl. --matched/--from/--ip, show, tail (timeout 5), stats ×5, report ×2, --raw ×2, export jsonl/csv/aws|jq, ch retention ×3, ch migrate, make geoip-test): all rc=0 (tail 124 by timeout). Claim "vector-central non parte senza i file GeoIP" verified (Vector: `Enrichment Table "geo_country": i/o error: No such file or directory`).
+
+## P3 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- G-P3: `make test-unit` (0 FAIL) && `make lab-up` rc 0 && `make test-e2e` PASSED 62/62 && `tests/e2e/central.sh` ALL PASS (T-C1 62/62 ≤ 10 s, matches 62, heartbeat, GB/SE/ASN 29518, agg 136) && `tests/e2e/cli.sh` ALL PASS 20/20. G-U31..G-U36 PASS.
+- Review (agent-1, self-review):
+  - I-6: in the last hour `count()` 3863 vs `uniqExact(request_id)` 3856 → 7 duplicate rows, all at 00:08–00:09 UTC and also duplicated in raw/events.jsonl: one-off re-read when 3.1 replaced the two file sources (`waf_access`/`waf_audit`) by `waf_logs` (new source id = no checkpoint). No duplicates in any 5-minute window after 00:10 across rotations and restarts. Steady state holds I-6; noted in Do-not-repeat (renaming the node file source re-reads the current logs).
+  - I-7: DDL `DateTime64(3,'UTC')`; window params are epoch ms (`fromUnixTimestamp64Milli(…,'UTC')`); `--from` without zone rejected (TestQ2_); CLI/report print UTC with `Z`/"UTC".
+  - SQL parameterisation: all user values are `{name:Type}` params (TestQ1_ asserts absence of values from SQL); string concatenation in ch/logs/stats only joins constants (fixed fragments, DDL column names, fixed table lists). `ch retention` days are a `{days:UInt32}` param. No injection path found.
+  - Docs: observability.md copy-paste checked (3.6).
+- README obligation met (Osservabilità section, docs/observability.md, operations.md).
