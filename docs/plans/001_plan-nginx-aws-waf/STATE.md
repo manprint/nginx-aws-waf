@@ -1,18 +1,18 @@
 # nginx AWS WAF — State
 
 Format: pev-state 2
-Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn branch `main` (no commits; unit 0.1 makes the first commit) · updated 27-11-2026 03:50 UTC by agent-1:opus
+Plan 001 rev 1 · repo /home/fabio/Scrivania/nginx_aws_waf · baseline unborn branch `main` (no commits; unit 0.1 makes the first commit) · updated 27-11-2026 04:50 UTC by agent-1:opus
 §0 Protocol: without this skill read PROTOCOL.md once. History: history.md (append-only, never read to resume).
 
 ## 1. Now
-- Run: execute 001 · result COMPLETE · style handoff · acting as agent-1:opus
+- Run: verify 001 (V001, correction pass V6) · result RUNNING · settings autonomy true (§3), WIP on (§3) · acting as agent-1:opus
 - Settings: autonomy true (plan) · WIP on (plan) · deadline none
 - Stop latch: none
 - Scope: plan 001 · COMPLETE · overrides none
 - Unit: none
 - Base: HEAD 49bacd7 + clean tree · branch main · last WIP tree none
 - Last closure: unit:PLAN:1
-- Next: none (plan 001 COMPLETE)
+- Next: V001-C1 (reopens phase 5), then V001-C2, P5/2, PLAN/2
 - Owner: agent-1:opus active since 26-11-2026 22:35 UTC
 
 ## 2. Readiness
@@ -118,7 +118,13 @@ none
 | PLAN | DONE | 1 | — | unit:PLAN:1 |
 
 README obligation: fulfilled (1.9, 2.5, 3.6, 4.4, 5.5, 6.5).
-Open corrections: none. Open audits: none.
+Open audits: none.
+
+Corrections (V001):
+| Correction | Status | Attempt | Findings | Reopens | Closure ref |
+|------------|--------|---------|----------|---------|-------------|
+| V001-C1 | TODO | — | F1 | 5 | — |
+| V001-C2 | TODO | — | F2 | — | — |
 Statuses: TODO, IN_PROGRESS, IN_REVIEW, DONE, SKIPPED (reason kept), BLOCKED.
 
 ## 12. Suspended implementation

@@ -483,3 +483,6 @@
   - The geoip timer needs a MaxMind account.
   - The ingest-lag alert also fires on idle lab sites (documented).
 - STATE compacted to its final form.
+
+## 27-11-2026 V001/1 complete (audit commit)
+Gates: all registry gates run on 2d33b11 (results in verify_001); multinode FAILED 4 after pki.sh → V001-F1. Review: agent-1:opus. Verdict FAIL (1 MAJOR, 1 MINOR). Corrections V001-C1 (reopens phase 5), V001-C2.
