@@ -79,7 +79,7 @@ func TestQ4_SchemaColumns(t *testing.T) {
 	}
 }
 
-func TestQ3_RawPassesParams(t *testing.T) {
+func TestQR1_RawPassesParams(t *testing.T) {
 	var args []string
 	var stdin string
 	r := &Raw{Dir: "/tmp", Run: func(_ context.Context, a []string, in []byte) ([]byte, error) {

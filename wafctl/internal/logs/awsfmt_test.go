@@ -18,7 +18,7 @@ func fixtureEvent(action, rule, typ string, status int) Event {
 		RequestHeaders: map[string]string{"User-Agent": "x", "Host": "demo.lab.test"}}
 }
 
-func TestTX1_ToAWSGolden(t *testing.T) {
+func TestX1_ToAWSGolden(t *testing.T) {
 	cases := map[string]struct {
 		ev Event
 		ms []Match
@@ -64,7 +64,7 @@ func TestTX1_ToAWSGolden(t *testing.T) {
 	}
 }
 
-func TestTX2_CSVHeader(t *testing.T) {
+func TestX2_CSVHeader(t *testing.T) {
 	cols, err := CSVColumns()
 	if err != nil {
 		t.Fatal(err)
