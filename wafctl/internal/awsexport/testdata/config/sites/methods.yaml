@@ -1,0 +1,10 @@
+version: 1
+site_id: methods
+server_names: [methods.example.com]
+app: generic
+upstream: {servers: ["10.0.0.1:8080"]}
+custom_rules:
+  - name: BlockWriteOnApi
+    slot: start
+    action: block
+    match: {all: [{method: [PUT, DELETE]}, {uri_path: {starts_with: /api/}}]}

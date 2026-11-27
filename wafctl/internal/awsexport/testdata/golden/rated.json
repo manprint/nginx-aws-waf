@@ -1,0 +1,213 @@
+{
+  "web_acl": {
+    "DefaultAction": {
+      "Allow": {}
+    },
+    "Name": "waf-rated",
+    "Rules": [
+      {
+        "Action": {
+          "Block": {}
+        },
+        "Name": "RateLimit",
+        "Priority": 0,
+        "Statement": {
+          "RateBasedStatement": {
+            "AggregateKeyType": "IP",
+            "EvaluationWindowSec": 300,
+            "Limit": 2000
+          }
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "RateLimit",
+          "SampledRequestsEnabled": true
+        }
+      },
+      {
+        "Action": {
+          "Block": {}
+        },
+        "Name": "GeoBlock",
+        "Priority": 10,
+        "Statement": {
+          "GeoMatchStatement": {
+            "CountryCodes": [
+              "KP",
+              "IR"
+            ]
+          }
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "GeoBlock",
+          "SampledRequestsEnabled": true
+        }
+      },
+      {
+        "Action": {
+          "Allow": {}
+        },
+        "Name": "OfficeAllow",
+        "Priority": 20,
+        "Statement": {
+          "OrStatement": {
+            "Statements": [
+              {
+                "IPSetReferenceStatement": {
+                  "ARN": "arn:aws:wafv2:eu-south-1:123456789012:regional/ipset/waf-rated-OfficeAllow-v4/00000000-0000-0000-0000-000000000000"
+                }
+              },
+              {
+                "IPSetReferenceStatement": {
+                  "ARN": "arn:aws:wafv2:eu-south-1:123456789012:regional/ipset/waf-rated-OfficeAllow-v6/00000000-0000-0000-0000-000000000000"
+                }
+              }
+            ]
+          }
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "OfficeAllow",
+          "SampledRequestsEnabled": true
+        }
+      },
+      {
+        "Name": "AWS-AWSManagedRulesAmazonIpReputationList",
+        "OverrideAction": {
+          "None": {}
+        },
+        "Priority": 30,
+        "Statement": {
+          "ManagedRuleGroupStatement": {
+            "Name": "AWSManagedRulesAmazonIpReputationList",
+            "VendorName": "AWS"
+          }
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "AWS-AWSManagedRulesAmazonIpReputationList",
+          "SampledRequestsEnabled": true
+        }
+      },
+      {
+        "Name": "AWS-AWSManagedRulesCommonRuleSet",
+        "OverrideAction": {
+          "None": {}
+        },
+        "Priority": 40,
+        "Statement": {
+          "ManagedRuleGroupStatement": {
+            "Name": "AWSManagedRulesCommonRuleSet",
+            "VendorName": "AWS"
+          }
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "AWS-AWSManagedRulesCommonRuleSet",
+          "SampledRequestsEnabled": true
+        }
+      },
+      {
+        "Name": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
+        "OverrideAction": {
+          "None": {}
+        },
+        "Priority": 50,
+        "Statement": {
+          "ManagedRuleGroupStatement": {
+            "Name": "AWSManagedRulesKnownBadInputsRuleSet",
+            "VendorName": "AWS"
+          }
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
+          "SampledRequestsEnabled": true
+        }
+      },
+      {
+        "Action": {
+          "Count": {}
+        },
+        "Name": "BigHeader",
+        "Priority": 60,
+        "Statement": {
+          "AndStatement": {
+            "Statements": [
+              {
+                "SizeConstraintStatement": {
+                  "ComparisonOperator": "GT",
+                  "FieldToMatch": {
+                    "SingleHeader": {
+                      "Name": "x-big"
+                    }
+                  },
+                  "Size": 4096,
+                  "TextTransformations": [
+                    {
+                      "Priority": 0,
+                      "Type": "NONE"
+                    }
+                  ]
+                }
+              },
+              {
+                "ByteMatchStatement": {
+                  "FieldToMatch": {
+                    "SingleHeader": {
+                      "Name": "x-env"
+                    }
+                  },
+                  "PositionalConstraint": "CONTAINS",
+                  "SearchString": "${jndi",
+                  "TextTransformations": [
+                    {
+                      "Priority": 0,
+                      "Type": "LOWERCASE"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "BigHeader",
+          "SampledRequestsEnabled": true
+        }
+      }
+    ],
+    "Scope": "REGIONAL",
+    "VisibilityConfig": {
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "waf-rated",
+      "SampledRequestsEnabled": true
+    }
+  },
+  "ip_sets": [
+    {
+      "Addresses": [
+        "203.0.113.200/32",
+        "198.51.100.7/32"
+      ],
+      "IPAddressVersion": "IPV4",
+      "Name": "waf-rated-OfficeAllow-v4",
+      "Scope": "REGIONAL"
+    },
+    {
+      "Addresses": [
+        "2001:db8::1/128"
+      ],
+      "IPAddressVersion": "IPV6",
+      "Name": "waf-rated-OfficeAllow-v6",
+      "Scope": "REGIONAL"
+    }
+  ],
+  "manual_steps": [
+    "Replace the IP set ARNs in web_acl with the ARNs returned by CreateIPSet (create the IP sets first)",
+    "Associate the web ACL with the ALB (aws_wafv2_web_acl_association or console)"
+  ],
+  "lossy": []
+}

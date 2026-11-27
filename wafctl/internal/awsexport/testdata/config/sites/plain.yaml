@@ -1,0 +1,6 @@
+version: 1
+site_id: plain
+server_names: [plain.example.com]
+app: generic
+upstream: {servers: ["10.0.0.1:8080"]}
+profile: aws-default

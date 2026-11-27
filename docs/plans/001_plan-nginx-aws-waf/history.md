@@ -358,3 +358,15 @@
 - WRITE lab/config/node.yaml: `geoip.enabled: true` (MaxMind test DBs). lab-min-up already runs geoip-test when the mmdb is missing, which is equivalent to the dependency the plan asks for.
 - NEW TestR13_ (SecGeoLookupDb, plus the GeoBlock custom rule `@rx ^(?:GB)$` before the first managed group) and TestR14_ (`rate=10r/m`, `burst=10`, no dry_run for block).
 - G-U61: 2 PASS. `make test-e2e` PASSED 65/65 (with optional.yaml). ratelimit.sh ALL PASS. Regression: smoke, apply, central and cli ALL PASS; go test 0 FAIL.
+
+## 6.2 attempt 1 — DONE (27-11-2026 UTC, agent-1:opus)
+- NEW wafctl/internal/awsexport:
+  - model.go: Build with the order rate → start customs (GeoBlock first) → group + after: customs, and priorities 0, 10, 20, …. Overrides are emitted only when they differ from the catalog default. A count-mode site makes everything Count. Also holds LossyError and the manual_steps.
+  - stmt.go: the condition → statement table, IP sets split into v4/v6 with placeholder ARNs, and bare IPs turned into /32 or /128.
+  - json.go.
+  - hcl.go: a stub for 6.3.
+- Golden files and fixtures live under testdata/{golden,config}.
+- NEW cmd/wafctl/exportaws.go: `export-aws` command. Lossy reasons → exit 2 with the list. Config is validated before export.
+- NEW scripts/aws-validate-acl.sh (create-web-acl or --ip-set): uses the local aws CLI 2.35.21, falling back to the docker image `amazon/aws-cli:2.35.21`, pinned to the same version (§6 pin). The fallback was tested with a PATH that has no aws: VALID.
+- Makefile: `aws-export-check` runs the T-EXP7 loop.
+- G-U62: TestEXP1–6 6 PASS. T-EXP7: all 12 lab sites VALID. The golden web_acls and the IP set are VALID too. A negative control without a complete VisibilityConfig → INVALID rc=252. The shop18 lossy list is `["client_ip.source=xff"]`. make test-unit: 15 ok.

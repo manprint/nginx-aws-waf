@@ -1,0 +1,149 @@
+{
+  "web_acl": {
+    "DefaultAction": {
+      "Allow": {}
+    },
+    "Name": "waf-tunedaws",
+    "Rules": [
+      {
+        "Name": "AWS-AWSManagedRulesAmazonIpReputationList",
+        "OverrideAction": {
+          "None": {}
+        },
+        "Priority": 0,
+        "Statement": {
+          "ManagedRuleGroupStatement": {
+            "Name": "AWSManagedRulesAmazonIpReputationList",
+            "VendorName": "AWS"
+          }
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "AWS-AWSManagedRulesAmazonIpReputationList",
+          "SampledRequestsEnabled": true
+        }
+      },
+      {
+        "Name": "AWS-AWSManagedRulesCommonRuleSet",
+        "OverrideAction": {
+          "None": {}
+        },
+        "Priority": 10,
+        "Statement": {
+          "ManagedRuleGroupStatement": {
+            "Name": "AWSManagedRulesCommonRuleSet",
+            "RuleActionOverrides": [
+              {
+                "ActionToUse": {
+                  "Count": {}
+                },
+                "Name": "SizeRestrictions_BODY"
+              }
+            ],
+            "VendorName": "AWS"
+          }
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "AWS-AWSManagedRulesCommonRuleSet",
+          "SampledRequestsEnabled": true
+        }
+      },
+      {
+        "Action": {
+          "Block": {}
+        },
+        "Name": "BlockLargeBodyOutsideRpc",
+        "Priority": 20,
+        "Statement": {
+          "AndStatement": {
+            "Statements": [
+              {
+                "LabelMatchStatement": {
+                  "Key": "awswaf:managed:aws:core-rule-set:SizeRestrictions_Body",
+                  "Scope": "LABEL"
+                }
+              },
+              {
+                "NotStatement": {
+                  "Statement": {
+                    "RegexMatchStatement": {
+                      "FieldToMatch": {
+                        "UriPath": {}
+                      },
+                      "RegexString": "^/web/(dataset|webclient)/",
+                      "TextTransformations": [
+                        {
+                          "Priority": 0,
+                          "Type": "URL_DECODE_UNI"
+                        },
+                        {
+                          "Priority": 1,
+                          "Type": "LOWERCASE"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "BlockLargeBodyOutsideRpc",
+          "SampledRequestsEnabled": true
+        }
+      },
+      {
+        "Name": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
+        "OverrideAction": {
+          "None": {}
+        },
+        "Priority": 30,
+        "Statement": {
+          "ManagedRuleGroupStatement": {
+            "Name": "AWSManagedRulesKnownBadInputsRuleSet",
+            "ScopeDownStatement": {
+              "NotStatement": {
+                "Statement": {
+                  "ByteMatchStatement": {
+                    "FieldToMatch": {
+                      "UriPath": {}
+                    },
+                    "PositionalConstraint": "STARTS_WITH",
+                    "SearchString": "/static-ok/",
+                    "TextTransformations": [
+                      {
+                        "Priority": 0,
+                        "Type": "NONE"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "VendorName": "AWS"
+          }
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
+          "SampledRequestsEnabled": true
+        }
+      }
+    ],
+    "Scope": "REGIONAL",
+    "VisibilityConfig": {
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "waf-tunedaws",
+      "SampledRequestsEnabled": true
+    }
+  },
+  "ip_sets": [],
+  "manual_steps": [
+    "Set the ALB WAF body inspection limit to 16 KB (Load balancer attributes / WAF integration)",
+    "Associate the web ACL with the ALB (aws_wafv2_web_acl_association or console)"
+  ],
+  "lossy": []
+}

@@ -1,0 +1,7 @@
+version: 1
+node_id: exp-node
+role: node
+network: host
+listen: {http: 80, https: 443, ipv6: true}
+audit: {scope: all}
+geoip: {enabled: true}

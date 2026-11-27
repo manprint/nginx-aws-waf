@@ -1,0 +1,12 @@
+version: 1
+site_id: shadowed
+server_names: [shadowed.example.com]
+app: generic
+upstream: {servers: ["10.0.0.1:8080"]}
+profile: shadow
+custom_rules:
+  - name: AllowHealth
+    slot: start
+    action: allow
+    match: {all: [{uri_path: {exact: /healthz}}]}
+rate_limit: {limit: 100, window_sec: 300, action: block}

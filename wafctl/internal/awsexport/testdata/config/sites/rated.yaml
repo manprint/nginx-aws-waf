@@ -1,0 +1,16 @@
+version: 1
+site_id: rated
+server_names: [rated.example.com]
+app: generic
+upstream: {servers: ["10.0.0.1:8080"]}
+rate_limit: {limit: 2000, window_sec: 300, action: block}
+geo_block: {countries: [KP, IR], action: block}
+custom_rules:
+  - name: OfficeAllow
+    slot: start
+    action: allow
+    match: {all: [{ip_set: ["203.0.113.200/32", "2001:db8::1", "198.51.100.7"]}]}
+  - name: BigHeader
+    slot: after:AWSManagedRulesKnownBadInputsRuleSet
+    action: count
+    match: {all: [{size: {component: "header:X-Big", op: gt, value: 4096}}, {header: {name: X-Env, contains: "${jndi", transform: [lowercase]}}]}

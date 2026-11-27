@@ -25,6 +25,12 @@ tf-validate: ## terraform init (no backend) + validate of deploy/terraform in Do
 	docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v $(CURDIR)/deploy/terraform:/tf -w /tf $(TF_IMAGE) validate
 	docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v $(CURDIR)/deploy/terraform:/tf -w /tf $(TF_IMAGE) fmt -check -diff
 
+.PHONY: aws-export-check
+aws-export-check: wafctl ## T-EXP7: export-aws JSON of every lab site + offline AWS CLI validation
+	@mkdir -p build/aws; rc=0; for f in lab/config/sites/*.yaml; do s=$$(basename $$f .yaml); \
+	  ./wafctl/bin/wafctl export-aws --config lab/config --site $$s --allow-lossy --acl-only -o build/aws/$$s.json 2>/dev/null || rc=1; \
+	  r=$$(./scripts/aws-validate-acl.sh build/aws/$$s.json | tail -1); echo "$$s $$r"; [ "$$r" = VALID ] || rc=1; done; exit $$rc
+
 .PHONY: lists
 lists: ## prepare .run/lists for lab renders and nginx -t
 	mkdir -p .run/lists && cp data/ip-reputation/*.txt .run/lists/ && cp data/ip-reputation/custom-test.txt .run/lists/custom-reputation.txt && printf '2001:db8:bad::/48\n' >> .run/lists/custom-reputation.txt && printf '# placeholder\n' > .run/lists/HostingProviderIPList.txt
